@@ -1,0 +1,7 @@
+include "@std"
+
+fn main in
+    -4
+    dup print
+    0 < if "true" puts else "false" puts end
+end
