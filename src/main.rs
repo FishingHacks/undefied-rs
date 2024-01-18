@@ -31,7 +31,7 @@ pub struct Config {
 }
 
 fn main() -> std::io::Result<()> {
-    let config: Config = Config { target: CompilationTargets::Linux, no_inline: false };
+    let config: Config = Config { target: CompilationTargets::Linux, no_inline: true };
 
     let tokens = tokenizer::parse(CODE.to_string(), &"<built-in>".to_string());
     let mut program = parser::parse_tokens(tokens, &config);

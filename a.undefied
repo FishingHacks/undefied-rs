@@ -1,7 +1,5 @@
+include "@list"
 include "@std"
+include "@str"
 
-fn main in
-    -4
-    dup print
-    0 < if "true" puts else "false" puts end
-end
+fn main in end

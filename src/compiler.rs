@@ -88,7 +88,7 @@ pub fn compile(mut program: Program) -> String {
     str.push_str(START_BODY);
 
     if let Some(id) = program.main_fn {
-        let main_fn_contract = program.contracts.get(id).unwrap_or_else(|| {
+        let main_fn_contract = program.contracts.get(&id).unwrap_or_else(|| {
             err_generic("Expected the main function to have a contract, but found nothing")
         });
 
@@ -423,7 +423,11 @@ pub fn compile(mut program: Program) -> String {
                         str += "    ;; -- if --\n";
                         str += "    pop rax\n";
                         str += "    cmp rax, 0\n";
-                        str += &format!("    je addr_{reference}__\n");
+                        if program.ops[*program.refs.get(&(*reference as usize)).unwrap()].as_keyword().unwrap().keyword != Keyword::End {
+                            str += &format!("    je addr_{reference}__\n");
+                        } else {
+                            str += &format!("    je addr_{reference}\n");
+                        }
                     } else {
                         err(
                             loc,
@@ -477,7 +481,7 @@ pub fn compile(mut program: Program) -> String {
             }) => {
                 let is_export = program
                     .contracts
-                    .get(*id)
+                    .get(id)
                     .unwrap()
                     .attributes
                     .has_attribute("__export__");

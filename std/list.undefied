@@ -1,0 +1,30 @@
+include "@std"
+include "@ptr"
+
+fn add_element int ptr in
+    swap over
+    dup @8
+    1 +
+    ptr+
+    !8
+    inc8
+end
+
+fn get_element int ptr -- int in
+    over over @8
+    >= if "ERROR: get_element called with index >= len" panic end
+    
+    +ptr 1 ptr+ @8
+end
+
+fn remove_element ptr -- int in
+    dup @8
+    dup 0 = if "ERROR: remove_element called with no elements" panic end
+    over +ptr
+    @8
+    swap dec8
+end
+
+inline fn len ptr -- int in
+    @8
+end

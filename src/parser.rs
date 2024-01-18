@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::vec;
-use std::fs::read_to_string;
 
 use crate::error::{info, warn};
 use crate::tokenizer::{self, CharToken, IntegerToken, WordToken};
 use crate::typecheck::{type_vec_to_str, Type};
-use crate::utils::{iota, stringify_const, Twos};
+use crate::utils::{iota, stringify_const, Twos, get_stdpath};
 use crate::Config;
 use crate::{
     error::err,
@@ -489,7 +489,7 @@ pub struct Program {
     loc_eof: Loc,
     pub refs: HashMap<usize, usize>,
     pub mems: HashMap<u64, usize>,
-    pub contracts: Vec<ProcedureContract>,
+    pub contracts: HashMap<usize, ProcedureContract>,
     pub reversed_refs: HashMap<usize, usize>,
 }
 
@@ -503,7 +503,7 @@ impl Default for Program {
             reversed_refs: HashMap::default(),
             strings: vec![],
             main_fn: Option::default(),
-            contracts: vec![],
+            contracts: HashMap::default(),
         }
     }
 }
@@ -525,7 +525,8 @@ impl Program {
     pub fn reverse_refs(&mut self) {
         self.reversed_refs.clear();
         if self.refs.len() > self.reversed_refs.capacity() {
-            self.reversed_refs.reserve(self.refs.len() - self.reversed_refs.capacity());
+            self.reversed_refs
+                .reserve(self.refs.len() - self.reversed_refs.capacity());
         }
 
         for (k, v) in self.refs.iter() {
@@ -849,14 +850,24 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                     let str_tok: &StringToken = expect_str_tok!(&w.loc);
                     let mut path_str = str_tok.value.clone();
                     path_str += ".undefied";
-                    let mut path = PathBuf::new();
-                    path.push(&w.loc.file);
-                    path.pop();
-                    path.push(path_str);
-                    let path = path
-                        .to_str()
-                        .expect("Could not form path string")
-                        .to_string();
+                    let path = if path_str.starts_with("@") {
+                        let mut path = get_stdpath();
+                        path.push(&path_str[1..]);
+                        let path = path
+                            .to_str()
+                            .expect("Could not form path string")
+                            .to_string();
+                        path
+                    } else {
+                        let mut path = PathBuf::from(&w.loc.file);
+                        path.pop();
+                        path.push(path_str);
+                        let path = path
+                            .to_str()
+                            .expect("Could not form path string")
+                            .to_string();
+                        path
+                    };
                     if path == w.loc.file {
                         err(&w.loc, "Cannot include file from itself");
                     } else if !included_files.contains(&path) || pragma_multiple.contains(&path) {
@@ -1316,7 +1327,7 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                                 } else if KEYWORDS_NESTING.contains(&kw) {
                                     nesting += 1;
                                 }
-                            } else if value == "assembly" {
+                            } else if value == "assembly" || value == "memory" || value == "typefence" {
                                 nesting += 1;
                             }
                         }
@@ -1653,7 +1664,7 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                 } else if let Some(id) = procs.get(&w.value) {
                     if program
                         .contracts
-                        .get(*id)
+                        .get(id)
                         .unwrap()
                         .attributes
                         .has_attribute("deprecated")

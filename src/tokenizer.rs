@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::Chars};
 
-use crate::error::err;
+use crate::{error::err, utils::get_stdpath};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Loc {
@@ -21,7 +21,11 @@ impl Loc {
 
 impl Display for Loc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}:{}:{}", self.file, self.line, self.char))
+        let mut stdpath = get_stdpath().to_str().unwrap().to_string();
+        stdpath += "/";
+        let file = self.file.replace(&stdpath, "@");
+        
+        f.write_fmt(format_args!("{}:{}:{}", file, self.line, self.char))
     }
 }
 

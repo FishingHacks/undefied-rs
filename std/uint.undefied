@@ -1,0 +1,53 @@
+inline fn uprint int in print end
+
+fn u< int int -- bool in
+    .param __supports_linux__
+    assembly int int -- bool in
+        "    mov rcx, 0"
+        "    mov rdx, 1"
+        "    pop rbx"
+        "    pop rax"
+        "    cmp rax, rbx"
+        "    cmovb rcx, rdx"
+        "    push rcx"
+    end
+end
+
+fn u<= int int -- bool in
+    .param __supports_linux__
+    assembly int int -- bool in
+        "    mov rcx, 0"
+        "    mov rdx, 1"
+        "    pop rbx"
+        "    pop rax"
+        "    cmp rax, rbx"
+        "    cmovbe rcx, rdx"
+        "    push rcx"
+    end
+end
+
+fn u> int int -- bool in
+    .param __supports_linux__    
+    assembly int int -- bool in
+        "    mov rcx, 0"
+        "    mov rdx, 1"
+        "    pop rbx"
+        "    pop rax"
+        "    cmp rax, rbx"
+        "    cmova rcx, rdx"
+        "    push rcx"
+    end
+end
+
+fn u>= int int -- bool in
+    .param __supports_linux__
+    assembly int int -- bool in
+        "    mov rcx, 0"
+        "    mov rdx, 1"
+        "    pop rbx"
+        "    pop rax"
+        "    cmp rax, rbx"
+        "    cmovae rcx, rdx"
+        "    push rcx"
+    end
+end

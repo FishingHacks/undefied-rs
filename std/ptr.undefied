@@ -1,0 +1,17 @@
+inline fn ptr+ ptr int -- ptr in
+    .param __supports_linux__ assembly ptr int -- ptr in "pop rax" "pop rbx" "add rax, rbx" "push rax" end
+end
+
+inline fn +ptr int ptr -- ptr in
+    .param __supports_linux__ assembly int ptr -- ptr in "pop rax" "pop rbx" "add rax, rbx" "push rax" end
+end
+
+const sizeof(ptr) 8 end
+const nullptr 0 cast(ptr) end
+
+inline fn inc64 ptr in dup @64 1 + swap !64 end
+inline fn dec64 ptr in dup @64 1 - swap !64 end
+inline fn inc32 ptr in dup @32 1 + swap !32 end
+inline fn dec32 ptr in dup @32 1 - swap !32 end
+inline fn inc8  ptr in dup @8  1 + swap !8  end
+inline fn dec8  ptr in dup @8  1 - swap !8  end

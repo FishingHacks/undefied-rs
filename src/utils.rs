@@ -1,3 +1,5 @@
+use std::{path::PathBuf, env::current_exe};
+
 use crate::{parser::Constant, typecheck::Type};
 
 static mut INT: usize = 0;
@@ -11,7 +13,7 @@ pub fn iota() -> usize {
 }
 
 const CHARS: &[char] = &[
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
 ];
 
 pub fn stringify_ptr(mut ptr: usize) -> String {
@@ -61,4 +63,11 @@ impl<T1, T2> Twos<T1, T2> {
     pub fn b(value: T2) -> Self {
         Self::B(value)
     }
+}
+
+pub fn get_stdpath() -> PathBuf {
+    let mut path = PathBuf::from(current_exe().expect("Could not determine std library path"));
+    path.pop();
+    path.push("std");
+    path
 }

@@ -616,7 +616,7 @@ fn deprecated in end
 .ifeq __TARGET__ __TARGET_LINUX__
 fn main -- int in
   .param __supports_linux__
-  assembly "push 10" end fake(int) # Puts int 10 to exit with non-zero exitcode 10
+  assembly -- int in "push 10" end # Puts int 10 to exit with non-zero exitcode 10
 end
 .endif
 .ifeq __TARGET__ __TARGET_JAVASCRIPT__

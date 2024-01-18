@@ -63,7 +63,7 @@ pub fn link(program: &mut Program) {
                 } else {
                     err(
                         op1.get_location(),
-                        format!("Expected Return but found {:?}", op1),
+                        format!("Expected proc but found {:?}", op1),
                     );
                 }
                 current_fn = None;

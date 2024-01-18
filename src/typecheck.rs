@@ -197,7 +197,7 @@ impl Debug for Type {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TypecheckType {
     pub typ: Type,
     pub loc: Loc,
@@ -227,7 +227,7 @@ fn is_stack_equal(a: &Vec<TypecheckType>, b: &Vec<TypecheckType>) -> bool {
     }
 
     for i in 0..a.len() {
-        if a[i].typ.equal_to(&b[i].typ) {
+        if !a[i].typ.equal_to(&b[i].typ) {
             return false;
         }
     }
@@ -300,8 +300,10 @@ fn check_proctypefence(
             ),
         );
     }
-    let print_stack = stack.split_at(stack.len() - expected_types.len()).1.to_vec();
-
+    let print_stack = stack
+        .split_at(stack.len() - expected_types.len())
+        .1
+        .to_vec();
 
     for t in expected_types.iter().rev() {
         let stack_type = stack.pop().unwrap().typ;
@@ -339,7 +341,10 @@ fn check_proctypefence(
             if let Some(typ) = &types[(typ.to_u8() - Type::T1.to_u8()) as usize] {
                 stack.push(TypecheckType::new(typ.clone(), loc.clone()));
             } else {
-                err(loc, format!("Could not infer returntype for {}", typ.to_str()))
+                err(
+                    loc,
+                    format!("Could not infer returntype for {}", typ.to_str()),
+                )
             }
         } else {
             stack.push(TypecheckType::new(typ.clone(), loc.clone()));
@@ -365,7 +370,7 @@ fn typecheck_(
         match op {
             Operation::None(..) => {}
             Operation::CallProc(CallProc { id, loc }) => {
-                let contract = if let Some(v) = program.contracts.get(*id) {
+                let contract = if let Some(v) = program.contracts.get(id) {
                     v
                 } else {
                     err(&loc, "Could not find contract for the function call");
@@ -374,7 +379,7 @@ fn typecheck_(
             }
             Operation::Proc(Proc { id, loc, .. }) => {
                 while ip < program.ops.len() {
-                    if let Operation::Ret(..) = program.ops[ip] {
+                    if let Operation::Ret(Ret { is_end: true, .. }) = program.ops[ip] {
                         break;
                     }
                     ip += 1;
@@ -793,7 +798,7 @@ pub fn typecheck(program: &Program) {
         );
     }
     for proc in func_bodies {
-        let contract = program.contracts.get(proc.id).unwrap_or_else(|| {
+        let contract = program.contracts.get(&proc.id).unwrap_or_else(|| {
             err(
                 &proc.loc,
                 "Could not acquire contract of function. (typecheck)",

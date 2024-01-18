@@ -1,0 +1,42 @@
+inline fn putf int ptr int -- int in
+    1 syscall3
+end
+
+inline fn puts int ptr in
+    1 putf drop
+end
+
+inline fn lnputs int ptr in
+    puts
+    "\n" puts
+end
+
+fn iprint int in
+    dup 0 < if 
+        not 1 + "-" puts 
+    end
+    print
+end
+
+inline fn exit int in
+    60 syscall1 drop
+end
+
+fn panic int ptr in
+    "PANIC: " puts lnputs
+    1 exit
+end
+
+const true 1 cast(bool) end
+const false 0 cast(bool) end
+
+const sizeof(u8) 1 end
+const sizeof(i8) 1 end
+const sizeof(u16) 2 end
+const sizeof(i16) 2 end
+const sizeof(u32) 4 end
+const sizeof(i32) 4 end
+const sizeof(u64) 8 end
+const sizeof(i64) 8 end
+const sizeof(char) 1 end
+const null 0 end

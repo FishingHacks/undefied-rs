@@ -1,4 +1,9 @@
-use std::{env, path::PathBuf, fs::{read_dir, copy}};
+use std::{
+    env,
+    fs::{copy, create_dir, read_dir},
+    io::ErrorKind,
+    path::PathBuf,
+};
 
 fn main() {
     let mut path_std_in = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -17,6 +22,23 @@ fn main() {
 }
 
 fn copy_reverse(from: PathBuf, to: PathBuf) {
+    println!(
+        "cargo:warning=Copying directory {} to {}",
+        from.display(),
+        to.display()
+    );
+    match create_dir(&to) {
+        Ok(..) => println!("cargo:warning=Created dir {}", to.display()),
+        Err(e) => {
+            if e.kind() != ErrorKind::AlreadyExists {
+                println!(
+                    "cargo:warning=Failed to create dir {}: {:?}",
+                    to.display(),
+                    e
+                )
+            }
+        }
+    }
     for entry in read_dir(&from).unwrap() {
         let entry = match entry {
             Ok(v) => v,
@@ -31,9 +53,23 @@ fn copy_reverse(from: PathBuf, to: PathBuf) {
         if entry_type.is_dir() {
             copy_reverse(entry_path, to);
         } else if entry_type.is_file() {
+            println!(
+                "cargo:warning=Copying file {} to {}",
+                entry_path.display(),
+                to.display()
+            );
             match copy(&entry_path, &to) {
-                Ok(..) => println!("cargo:warning=Copied file {} to {}", entry_path.display(), to.display()),
-                Err(e) => println!("cargo:error=Failed to copy {} to {}: {:?}", entry_path.display(), to.display(), e),
+                Ok(..) => println!(
+                    "cargo:warning=Copied file {} to {}",
+                    entry_path.display(),
+                    to.display()
+                ),
+                Err(e) => println!(
+                    "cargo:warning=Failed to copy {} to {}: {:?}",
+                    entry_path.display(),
+                    to.display(),
+                    e
+                ),
             }
         } else {
             println!("cargo:warning=Skipped {}", entry_path.display())

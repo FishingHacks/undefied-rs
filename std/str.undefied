@@ -1,0 +1,34 @@
+include "@std"
+include "@uint"
+
+fn str::store int ptr ptr in
+    over cast(int) over !64 swap drop
+    swap cast(int) swap
+    8 ptr+
+    !64
+end
+
+fn str::print ptr in
+    dup @64 cast(ptr)
+    swap 8 ptr+ @8 swap cast(ptr) puts
+end
+
+fn str::eq int ptr int ptr -- bool in
+    memory ptra 8 end
+    memory ptrb 8 end
+    cast(int) ptra !64
+    swap cast(int) ptrb !64
+    over
+    != if drop false return end
+    
+
+    0 while over over u> do
+        dup ptra +ptr @8
+        over ptrb +ptr @8
+        != if drop drop false return end
+        1 +
+    end drop drop
+    true
+end
+
+const sizeof(str) 9 end

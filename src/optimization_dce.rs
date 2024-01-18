@@ -4,7 +4,7 @@ pub fn optimize(program: &mut Program) {
     let mut for_visit: Vec<usize> = program
         .contracts
         .iter()
-        .map(|contract| contract.id)
+        .map(|(_, contract)| contract.id)
         .filter(|id| match &program.ops[*program.refs.get(id).unwrap_or(&0)] {
             Operation::Proc(Proc { used, .. }) => *used,
             _ => false,
@@ -44,7 +44,7 @@ pub fn optimize(program: &mut Program) {
         }
     }
 
-    for contract in &program.contracts {
+    for (_, contract) in &program.contracts {
         let mut ip = *program.refs.get(&contract.id).unwrap();
         if !program.ops[ip].as_proc().unwrap().used {
             while ip < program.ops.len() {
