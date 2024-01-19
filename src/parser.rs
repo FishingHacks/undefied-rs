@@ -8,7 +8,7 @@ use std::vec;
 use crate::error::{info, warn};
 use crate::tokenizer::{self, CharToken, IntegerToken, WordToken};
 use crate::typecheck::{type_vec_to_str, Type};
-use crate::utils::{iota, stringify_const, Twos, get_stdpath};
+use crate::utils::{get_stdpath, iota, stringify_const, Twos};
 use crate::Config;
 use crate::{
     error::err,
@@ -643,6 +643,11 @@ pub const PREPROCESSOR_NAMES: &[&str] = &[
     ".is",
     ".isn",
     ".pragma",
+    ".has_param",
+    ".hasn_param",
+    ".check_param",
+    ".checkn_param",
+    ".get_param",
 ];
 pub const PREPROCESSOR_CONDITIONAL_BRANCH: &[&str] = &[".end", ".else"];
 pub const SPECIAL_KEYWORD_NAMES: &[&str] = &[
@@ -1327,7 +1332,10 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                                 } else if KEYWORDS_NESTING.contains(&kw) {
                                     nesting += 1;
                                 }
-                            } else if value == "assembly" || value == "memory" || value == "typefence" {
+                            } else if value == "assembly"
+                                || value == "memory"
+                                || value == "typefence"
+                            {
                                 nesting += 1;
                             }
                         }
@@ -1653,6 +1661,97 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                     } else {
                         err(loc, format!("Expected once or multiple, but found {value}"));
                     }
+                } else if w.value == ".has_param" || w.value == ".hasn_param" {
+                    let function_name = expect_word_tok!(&w.loc);
+                    let parameter = expect_word_tok!(&function_name.loc);
+                    if let Some(func) = procs.get(&function_name.value) {
+                        let mut boolean = match program.contracts.get(func) {
+                            Some(v) => v.attributes.has_attribute(parameter.value.as_str()),
+                            None => err(
+                                &function_name.loc,
+                                format!(
+                                    "Could not find any function with the name {}",
+                                    function_name.value
+                                ),
+                            ),
+                        };
+                        if w.value == ".hasn_param" {
+                            boolean = !boolean;
+                        }
+                        preprocessor_results.push(boolean);
+                    } else {
+                        err(
+                            &function_name.loc,
+                            format!(
+                                "Could not find any function with the name {}",
+                                function_name.value
+                            ),
+                        )
+                    }
+                } else if w.value == ".check_param" || w.value == ".checkn_param" {
+                    let function_name = expect_word_tok!(&w.loc);
+                    let parameter = expect_word_tok!(&function_name.loc);
+                    ip += 1;
+                    if ip >= tokens.len() {
+                        err(&parameter.loc, "Expected a value but found nothing");
+                    }
+                    let value = parse_value(&tokens[ip], &consts, &inline_procs).to_string();
+
+                    if let Some(func) = procs.get(&function_name.value) {
+                        let mut boolean = match program.contracts.get(func) {
+                            Some(v) => v
+                                .attributes
+                                .has_attribute_value(parameter.value.as_str(), value.as_str()),
+                            None => err(
+                                &function_name.loc,
+                                format!(
+                                    "Could not find any function with the name {}",
+                                    function_name.value
+                                ),
+                            ),
+                        };
+                        if w.value == ".checkn_param" {
+                            boolean = !boolean;
+                        }
+                        preprocessor_results.push(boolean);
+                    } else {
+                        err(
+                            &function_name.loc,
+                            format!(
+                                "Could not find any function with the name {}",
+                                function_name.value
+                            ),
+                        )
+                    }
+                } else if w.value == ".get_param" {
+                    let function_name = expect_word_tok!(&w.loc);
+                    let parameter = expect_word_tok!(&function_name.loc);
+                    if let Some(func) = procs.get(&function_name.value) {
+                        let value = match program.contracts.get(func) {
+                            Some(v) => v.attributes.get_value(parameter.value.as_str()),
+                            None => err(
+                                &function_name.loc,
+                                format!(
+                                    "Could not find any function with the name {}",
+                                    function_name.value
+                                ),
+                            ),
+                        };
+                        let value = match value {
+                            Some(v) => v,
+                            None => err(&parameter.loc, format!("Function {} does not have parameter {}", function_name.value, parameter.value)),
+                        };
+                        tokens_to_insert.push(Token::str_token(w.loc.clone(), value.clone(), false));
+                    } else {
+                        err(
+                            &function_name.loc,
+                            format!(
+                                "Could not find any function with the name {}",
+                                function_name.value
+                            ),
+                        )
+                    }
+
                 } else if let Some(offset) = mems_local.get(&w.value) {
                     ensure_in_fn!(&w.loc);
                     program
