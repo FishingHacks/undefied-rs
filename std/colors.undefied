@@ -6,8 +6,9 @@ include "@io"
 # ColorCode: 38;2;R;G;B              -> Changes the text color to the RGB value
 # ColorCode: 48;2;R;G;B              -> Changes the background color to the RGB value
 
-fn color_RGB int int int in "[38;2;" puts putu ";" puts putu ";" puts putu "m" puts end
-fn color_bg_RGB int int int in "[48;2;" puts putu ";" puts putu ";" puts putu "m" puts end
+# TODO: fputu, fputi
+# fn color_RGB int int int in "[38;2;" puts putu ";" puts putu ";" puts putu "m" puts end
+# fn color_bg_RGB int int int in "[48;2;" puts putu ";" puts putu ";" puts putu "m" puts end
 
 inline fn color_RESET in "[39m" puts end
 inline fn bg_RESET in "[49m" puts end

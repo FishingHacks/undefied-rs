@@ -1,3 +1,6 @@
-include "@bool"
+include "@io"
+include "@colors"
 
-fn main in end
+fn main in
+    red style_bold "Error:" puts all_RESET " a.undefied:3:4: Undefined variable abc" puts
+end
