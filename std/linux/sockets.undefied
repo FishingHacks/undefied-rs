@@ -1,0 +1,125 @@
+include "@bswap"
+include "@linux/syscalltable"
+include "@ptr"
+include "@std"
+
+.ifdef AF_UNIX undef AF_UNIX .end
+.ifdef AF_LOCAL undef AF_LOCAL .end
+.ifdef AF_INET undef AF_INET .end
+.ifdef AF_AX25 undef AF_AX25 .end
+.ifdef AF_IPX undef AF_IPX .end
+.ifdef AF_APPLETALK undef AF_APPLETALK .end
+.ifdef AF_X25 undef AF_X25 .end
+.ifdef AF_INET6 undef AF_INET6 .end
+.ifdef AF_DECnet undef AF_DECnet .end
+.ifdef AF_KEY undef AF_KEY .end
+.ifdef AF_NETLINK undef AF_NETLINK .end
+.ifdef AF_PACKET undef AF_PACKET .end
+.ifdef AF_RDS undef AF_RDS .end
+.ifdef AF_PPPOX undef AF_PPPOX .end
+.ifdef AF_LLC undef AF_LLC .end
+.ifdef AF_IB undef AF_IB .end
+.ifdef AF_MPLS undef AF_MPLS .end
+.ifdef AF_CAN undef AF_CAN .end
+.ifdef AF_TIPC undef AF_TIPC .end
+.ifdef AF_BLUETOOTH undef AF_BLUETOOTH .end
+.ifdef AF_ALG undef AF_ALG .end
+.ifdef AF_VSOCK undef AF_VSOCK .end
+.ifdef AF_KCM undef AF_KCM .end
+.ifdef AF_XDP undef AF_XDP .end
+.ifdef SOCK_STREAM undef SOCK_STREAM .end
+.ifdef SOCK_DGRAM undef SOCK_DGRAM .end
+.ifdef SOCK_RAW undef SOCK_RAW .end
+.ifdef SOCK_RDM undef SOCK_RDM .end
+.ifdef SOCK_SEQPACKET undef SOCK_SEQPACKET .end
+.ifdef SOCK_PACKET undef SOCK_PACKET .end
+.ifdef SOCK_NONBLOCK undef SOCK_NONBLOCK .end
+.ifdef SOCK_CLOEXEC undef SOCK_CLOEXEC .end
+.ifdef socket undef socket .end
+.ifdef INADDR_LOCAL undef INADDR_LOCAL .end
+.ifdef sizeof(sockaddr) undef sizeof(sockaddr) .end
+.ifdef sockaddr_in.sin_family undef sockaddr_in.sin_family .end
+.ifdef sockaddr_in.sin_port undef sockaddr_in.sin_port .end
+.ifdef sockaddr_in.sin_addr undef sockaddr_in.sin_addr .end
+.ifdef sizeof(sockaddr_in.sin_family) undef sizeof(sockaddr_in.sin_family) .end
+.ifdef sizeof(sockaddr_in.sin_port) undef sizeof(sockaddr_in.sin_port) .end
+.ifdef sizeof(sockaddr_in.sin_addr) undef sizeof(sockaddr_in.sin_addr) .end
+.ifdef listen undef listen .end
+.ifdef bind undef bind .end
+.ifdef accept undef accept .end
+.ifdef read undef read .end
+.ifdef close undef close .end
+.ifdef sendto undef sendto .end
+.ifdef send undef send .end
+.ifdef htons undef htons .end
+
+const AF_UNIX 1 end
+const AF_LOCAL AF_UNIX end
+const AF_INET 2 end
+const AF_AX25 3 end
+const AF_IPX 4 end
+const AF_APPLETALK 5 end
+const AF_X25  9 end
+const AF_INET6 10 end
+const AF_DECnet 12 end
+const AF_KEY 15 end
+const AF_NETLINK 16 end
+const AF_PACKET 17 end
+const AF_RDS 21 end
+const AF_PPPOX 24 end
+const AF_LLC 26 end
+const AF_IB 27 end
+const AF_MPLS 28 end
+const AF_CAN 29 end
+const AF_TIPC 30 end
+const AF_BLUETOOTH 31 end
+const AF_ALG 38 end
+const AF_VSOCK 40 end
+const AF_KCM 41 end
+const AF_XDP 44 end
+
+const SOCK_STREAM 1 end
+const SOCK_DGRAM 2 end
+const SOCK_RAW 3 end
+const SOCK_RDM 4 end
+const SOCK_SEQPACKET 5 end
+const SOCK_PACKET 10 end
+const SOCK_NONBLOCK 04000 end
+const SOCK_CLOEXEC 02000000 end
+
+inline fn socket int int int -- int in
+    SYS_socket syscall3
+end
+
+const sizeof(sockaddr) 16 end
+const sockaddr_in.sin_family 0 end
+const sockaddr_in.sin_port 2 end
+const sockaddr_in.sin_addr 4 end
+const sizeof(sockaddr_in.sin_family) 2 end
+const sizeof(sockaddr_in.sin_port) 2 end
+const sizeof(sockaddr_in.sin_addr) 4 end
+
+const Socket::INADDR_LOCAL 16777343 end
+
+inline fn Socket::listen int int -- int in SYS_listen syscall2 end
+inline fn Socket::bind int ptr int -- int in SYS_bind syscall3 end
+inline fn Socket::accept int ptr ptr -- int in SYS_accept syscall3 end
+inline fn Socket::read int ptr int -- int in SYS_read syscall3 end
+inline fn Socket::close int -- int in SYS_close syscall1 end
+inline fn Socket::sendto int ptr int int ptr int -- int in SYS_sendto syscall6 end
+
+fn Socket::send int ptr int int -- int in
+  memory tmp_send_mem sizeof(u64) 4 * end
+  cast(int) tmp_send_mem sizeof(u64) 3 * ptr+ !64
+  cast(int) tmp_send_mem sizeof(u64) 1 * ptr+ !64
+  cast(int) tmp_send_mem sizeof(u64) 2 * ptr+ !64
+  cast(int) tmp_send_mem sizeof(u64) 0 * ptr+ !64
+  0 nullptr
+  tmp_send_mem sizeof(u64) 3 * ptr+ @64 cast(int)
+  tmp_send_mem sizeof(u64) 2 * ptr+ @64 cast(int)
+  tmp_send_mem sizeof(u64) 1 * ptr+ @64 cast(ptr)
+  tmp_send_mem sizeof(u64) 0 * ptr+ @64 cast(int)
+  Socket::sendto
+end
+
+inline fn Socket::htons int -- int in bswap16 end

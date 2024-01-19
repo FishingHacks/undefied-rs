@@ -1,15 +1,4 @@
-inline fn putf int ptr int -- int in
-    1 syscall3
-end
-
-inline fn puts int ptr in
-    1 putf drop
-end
-
-inline fn lnputs int ptr in
-    puts
-    "\n" puts
-end
+include "@io"
 
 fn iprint int in
     dup 0 < if 

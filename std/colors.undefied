@@ -1,0 +1,67 @@
+include "@io"
+
+# Color format: \033[ColorCodem
+#               ^^^^(the weird character at the start)
+# ColorCode: Some pre-defined number -> Styles the number by the stylings associated with that number
+# ColorCode: 38;2;R;G;B              -> Changes the text color to the RGB value
+# ColorCode: 48;2;R;G;B              -> Changes the background color to the RGB value
+
+fn color_RGB int int int in "[38;2;" puts putu ";" puts putu ";" puts putu "m" puts end
+fn color_bg_RGB int int int in "[48;2;" puts putu ";" puts putu ";" puts putu "m" puts end
+
+inline fn color_RESET in "[39m" puts end
+inline fn bg_RESET in "[49m" puts end
+
+inline fn allColors_RESET in color_RESET bg_RESET end
+
+inline fn bold_RESET in "[22m" puts end
+inline fn italic_RESET in "[23m" puts end
+inline fn strikethrough_RESET in "[29m" puts end
+inline fn underline_RESET in "[24m" puts end
+
+inline fn style_RESET in bold_RESET italic_RESET strikethrough_RESET underline_RESET end
+
+inline fn all_RESET in style_RESET allColors_RESET end
+
+inline fn black in "[30m" puts end
+inline fn blue in "[34m" puts end
+inline fn cyan in "[36m" puts end
+inline fn gray in "[90m" puts end
+inline fn green in "[32m" puts end
+inline fn magenta in "[35m" puts end
+inline fn red in "[31m" puts end
+inline fn white in "[37m" puts end
+inline fn yellow in "[33m" puts end
+
+inline fn blackBright in "[90m" puts end
+inline fn blueBright in "[94m" puts end
+inline fn cyanBright in "[96m" puts end
+inline fn greenBright in "[92m" puts end
+inline fn magentaBright in "[95m" puts end
+inline fn redBright in "[91m" puts end
+inline fn whiteBright in "[97m" puts end
+inline fn yellowBright in "[93m" puts end
+
+inline fn bgBlack in "[40m" puts end
+inline fn bgBlue in "[44m" puts end
+inline fn bgCyan in "[46m" puts end
+inline fn bgGray in "[100m" puts end
+inline fn bgGreen in "[42m" puts end
+inline fn bgMagenta in "[45m" puts end
+inline fn bgRed in "[41m" puts end
+inline fn bgWhite in "[47m" puts end
+inline fn bgYellow in "[43m" puts end
+
+inline fn bg_BlackBright in "[100m" puts end
+inline fn bg_BlueBright in "[104m" puts end
+inline fn bg_CyanBright in "[106m" puts end
+inline fn bg_GreenBright in "[102m" puts end
+inline fn bg_MagentaBright in "[105m" puts end
+inline fn bg_RedBright in "[101m" puts end
+inline fn bg_WhiteBright in "[107m" puts end
+inline fn bg_YellowBright in "[103m" puts end
+
+inline fn style_italic in "[3m" puts end
+inline fn style_strikethrough in "[9m" puts end
+inline fn style_underline in "[4m" puts end
+inline fn style_bold in "[1m" puts end

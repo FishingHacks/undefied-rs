@@ -1,0 +1,17 @@
+include "@io"
+
+.ifndef false const false 0 cast(bool) end
+.ifndef true const true 1 cast(bool) end
+
+const sizeof(bool) 1 end
+
+inline fn !bool bool ptr in .param __supports_linux__ assembly bool ptr -- int ptr in end !8 end
+inline fn @bool ptr -- bool in @8 cast(bool) end
+
+fn Bool::print bool in
+    if "true\n" puts else "false\n" puts end
+end
+
+fn Bool::to_string bool -- int ptr in
+    if "true" else "false" end
+end

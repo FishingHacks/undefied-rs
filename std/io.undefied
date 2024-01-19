@@ -1,0 +1,19 @@
+inline fn fputs int ptr int -- int in
+    1 syscall3
+end
+
+inline fn puts int ptr in
+    1 fputs drop
+end
+
+inline fn lnputs int ptr in
+    puts
+    "\n" puts
+end
+
+fn fputchar int int in
+    memory a 1 end
+    swap
+    a !8
+    1 a rot rot fputs drop
+end

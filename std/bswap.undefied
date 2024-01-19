@@ -1,0 +1,28 @@
+inline fn bswap16 int -- int in
+    assembly in
+        "pop rbx"
+        "movzx eax, bx"
+        "rol ax, 8"
+        "push rax"
+    end
+end
+
+inline fn bswap32 int -- int in
+    .param __supports_linux__
+    assembly in
+      "pop rbx"
+      "movzx eax, bx"
+      "bswap eax"
+      "push rax"
+    end
+end
+  
+inline fn bswap64 int -- int in
+    .param __supports_linux__
+    assembly in
+            "pop rbx"
+            "movzx eax, bx"
+            "bswap eax"
+            "push rax"
+        end
+end
