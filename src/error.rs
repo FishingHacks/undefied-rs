@@ -13,18 +13,18 @@ macro_rules! __exit {
 }
 
 pub fn err<T: Into<String>>(loc: &Loc, str: T) -> ! {
-    eprintln!("{} [ERR]: {}", loc, str.into());
+    eprintln!("\x1b[31;1merror\x1b[39;22m: {}: {}", loc, str.into());
     __exit!();
 }
 
 pub fn not_enough_types(loc: &Loc, types_expected: u8, types_actual: usize) -> ! {
-    println!("{loc} [ERR]: Expected {types_expected} arguments, but found only {types_actual}\n");
+    println!("\x1b[31;1merror\x1b[39;22m: {loc}: Expected {types_expected} arguments, but found only {types_actual}\n");
     __exit!();
 }
 
 pub fn check_type_mismatch(loc: &Loc, type_expected: &Type, type_actual: &Type) {
     if !type_expected.equal_to(type_actual) {
-        println!("{loc} [ERR]: Expected {type_expected}, but found {type_actual}\n");
+        println!("\x1b[31;1merror\x1b[39;22m: {loc}: Expected {type_expected}, but found {type_actual}\n");
         __exit!();
     }
 }
@@ -32,7 +32,7 @@ pub fn check_type_mismatch(loc: &Loc, type_expected: &Type, type_actual: &Type) 
 pub fn check_type_mismatch_multiple(loc: &Loc, type_expected: &[Type], type_actual: &Type) {
     if type_expected.iter().find(|typ| typ.equal_to(type_actual)).is_none() {
         println!(
-            "{loc} [ERR]: Expected {}, but found {type_actual}\n",
+            "\x1b[31;1merror\x1b[39;22m: {loc}: Expected {}, but found {type_actual}\n",
             type_expected
                 .iter()
                 .map(|t| format!("`{t}`"))
@@ -44,11 +44,11 @@ pub fn check_type_mismatch_multiple(loc: &Loc, type_expected: &[Type], type_actu
 }
 
 pub fn warn<T: Into<String>>(loc: &Loc, str: T) {
-    println!("{} [WARN]: {}", loc, str.into());
+    println!("\x1b[33;1mwarning\x1b[39;22m: {}: {}", loc, str.into());
 }
 
 pub fn info<T: Into<String>>(loc: &Loc, str: T) {
-    println!("{} [INFO]: {}", loc, str.into());
+    println!("\x1b[32;1minfo\x1b[39;22m: {}: {}", loc, str.into());
 }
 
 pub trait Log {
@@ -93,16 +93,16 @@ impl Log for Command {
 
 pub fn run_cmd(cmd: &Command) {
     println!(
-        "[CMD]: Running {} {}",
+        "\x1b[32;1minfo\x1b[39;22m: Running cmd {} {}",
         cmd.get_program().to_str().unwrap(),
         cmd.get_args()
             .map(|arg| arg.to_str().unwrap().to_string())
-            .reduce(|a, b| format!("{a}, {b}"))
+            .reduce(|a, b| format!("{a} {b}"))
             .unwrap_or_default()
     );
 }
 
 pub fn err_generic<S: Into<String>>(str: S) -> ! {
-    eprintln!("[ERR]: {}", str.into());
+    eprintln!("\x1b[31;1merror\x1b[39;22m: {}", str.into());
     __exit!();
 }

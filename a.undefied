@@ -1,6 +1,11 @@
 include "@io"
-include "@colors"
+include "@std"
+include "@errors"
 
 fn main in
-    red style_bold "Error:" puts all_RESET " a.undefied:3:4: Undefined variable abc" puts
+    # this syscall will fail:
+    "abc" 25 fputs
+    errno swap
+    "Return Value: " puts iprint # prints -1 for failures, otherwise the return value
+    "ERRNO: " puts iprint # prints the error number
 end

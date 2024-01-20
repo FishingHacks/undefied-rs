@@ -4,7 +4,7 @@ use crate::{
         CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program,
         PushAssembly, PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret,
     },
-    typecheck::Type,
+    typecheck::Type, utils::iota,
 };
 
 const START: &str = r#"BITS 64
@@ -63,8 +63,18 @@ fn syscall(mut num: u8) -> String {
     for i in 0..num {
         str += &format!("    pop {}\n", SYSCALL_REGS[i as usize]);
     }
-
-    str += "    syscall\n    push rax\n";
+    str += "    syscall\n";
+    str += "    xor rbx, rbx\n"; // xor rbx, rbx
+    str += "    cmp rax, rbx\n"; // cmp rax, rbx
+    let id = iota();
+    str += &format!("    jge after_syscall_{id}\n"); // jge .after_syscall_{id}
+    str += "    mov rbx, rax\n"; // mov rax, rbx
+    str += "    not rbx\n"; // not rbx
+    str += "    add rbx, 1\n"; // add rbx, 1
+    str += "    mov rax, -1\n"; // mov rax, -1
+    str += &format!("after_syscall_{id}:\n"); // .after_syscall_{id}:
+    str += "    mov [errno], rbx\n"; // mov [errno], rbx
+    str += "    push rax\n";
 
     str
 }
@@ -558,12 +568,13 @@ pub fn compile(mut program: Program) -> String {
                 .reduce(|acc, s| format!("{acc}, {s}"))
                 .unwrap_or_default()
         );
-        str += "\n"
+        str += ", 0x0\n"
     }
     str += "\nsegment .bss\n";
     str += "    ret_stack_rsp: resq 1\n";
     str += "    ret_stack: resb 4096\n";
     str += "    ret_stack_end:\n";
+    str += "    errno: resq 1\n";
     for (id, sz) in program.mems {
         str += &format!("    mem_{}: resb {}\n", id, sz);
     }

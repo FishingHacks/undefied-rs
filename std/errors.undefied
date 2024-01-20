@@ -1,0 +1,12 @@
+inline fn errno -- int in
+    .param __supports_linux__
+    assembly -- int in
+        "mov rax, [errno]"
+        "push rax"
+    end
+end
+
+inline fn errno_reset in
+    .param __supports_linux__
+    assembly in "mov [errno], 0" end
+end
