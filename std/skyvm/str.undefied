@@ -1,0 +1,33 @@
+include "@skyvm/std"
+include "@skyvm/io"
+
+fn str::store int ptr ptr in
+    over cast(int) over !32 swap drop
+    swap cast(int) swap
+    cast(int) 8 + cast(ptr)
+    !32
+end
+
+fn str::print ptr in
+    dup @32 cast(ptr)
+    swap cast(int) 8 + cast(ptr) @8 swap cast(ptr) puts
+end
+
+fn str::eq int ptr int ptr -- bool in
+    memory ptra 4 end
+    memory ptrb 4 end
+    cast(int) ptra !32
+    swap cast(int) ptrb !32
+    over
+    != if drop false return end
+    
+    0 while over over > do
+        dup ptra @32 + cast(ptr) @8
+        over ptrb @32 + cast(ptr) @8
+        != if drop drop false return end
+        1 +
+    end drop drop
+    true
+end
+
+const sizeof(str) 5 end

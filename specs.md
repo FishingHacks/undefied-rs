@@ -637,18 +637,24 @@ fn main in end
 
 **Available parameter**
 
-| Name                      |                                                                                                                                                                                        Usage |
-| :------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| `deprecated`              |                                                                                                                                                 Function Only: Mark a function as deprecated |
-| `__supports_linux__`      |                                                                                                                                                            Mark assembly as supporting Linux |
-| `__typecheck_ignore__`    |                                                                                                                                                                 dont typecheck this function |
-| `__provided_externally__` |                       Mark a function as provided by another file, and as that a foreign source provides it. This will expect the function name as a label in assembly, but wont compile it. |
-| `__export__`              |                                                                                                                               When the parser or vm supports exporting, export this function |
-| `__function_exits__`      |                                                                                                        This function will never return. All `ret` statements will get replaced with a panic. |
-| `__run_function__`        | This will cause the function to run before main. It has to have an empty in and out. All `__run_function__` marked functions will be ran in an arbitrary sequence, before the main function. |
-| `__nomain__`              |                                                               Apply this to the main function. It will cause it to not run it and instead just exit. May be useful for webassembly-alike vms |
-| `__fn_anonymous__`        |                                                               Mark an function as anonymous. This will make it not being assigned to its name. Useful in conjunction with `__run_function__` |
-| `__fn_anon__`             |                                                               Mark an function as anonymous. This will make it not being assigned to its name. Useful in conjunction with `__run_function__` |
+| Name                              |                                                                                                                                                                                        Usage |
+| :-------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| `deprecated`                      |                                                                                                                                                 Function Only: Mark a function as deprecated |
+| `__supports_linux__`              |                                                                                                                                                            Mark assembly as supporting Linux |
+| `__supports_skyvm__`              |                                                                                                                                                            Mark assembly as supporting skyvm |
+| `__supports_x86_64__`             |                                                                                                                                                           Mark assembly as supporting x86_64 |
+| `__supports_x86_64-linux__`       |                                                                                                                                                 Mark assembly as supporting x86_64 for linux |
+| `__supports__` <target>           |                                                                                                                                                         Mark assembly as supporting <target> |
+| `__typecheck_ignore__`            |                                                                                                                                                                 dont typecheck this function |
+| `__provided_externally__` <name?> |                Mark a function as provided by another file. The label name can be specified by setting the parameter to it, otherwise it will use the functions name. It wil call that label |
+| `__export__`                      |                                                                                                                               When the parser or vm supports exporting, export this function |
+| `__function_exits__`              |                                                                                                        This function will never return. All `ret` statements will get replaced with a panic. |
+| `__run_function__`                | This will cause the function to run before main. It has to have an empty in and out. All `__run_function__` marked functions will be ran in an arbitrary sequence, before the main function. |
+| `__nomain__`                      |                                                               Apply this to the main function. It will cause it to not run it and instead just exit. May be useful for webassembly-alike vms |
+| `__fn_anonymous__`                |                                                               Mark an function as anonymous. This will make it not being assigned to its name. Useful in conjunction with `__run_function__` |
+| `__fn_anon__`                     |                                                               Mark an function as anonymous. This will make it not being assigned to its name. Useful in conjunction with `__run_function__` |
+
+|
 
 # Code
 

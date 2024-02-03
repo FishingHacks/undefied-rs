@@ -1,3 +1,4 @@
+include "@constants"
 include "@io"
 
 fn iprint int in
@@ -7,25 +8,19 @@ fn iprint int in
     print
 end
 
-inline fn exit int in
-    60 syscall1 drop
-end
-
 fn panic int ptr in
     "PANIC: " puts lnputs
     1 exit
 end
 
-const true 1 cast(bool) end
-const false 0 cast(bool) end
+new_type i8 1
+new_type i16 2
+new_type i32 4
+new_type i64 8
+type isize i64 end
 
-const sizeof(u8) 1 end
-const sizeof(i8) 1 end
-const sizeof(u16) 2 end
-const sizeof(i16) 2 end
-const sizeof(u32) 4 end
-const sizeof(i32) 4 end
-const sizeof(u64) 8 end
-const sizeof(i64) 8 end
-const sizeof(char) 1 end
-const null 0 end
+.ifndef sizeof(i8) const sizeof(i8) 1 end .end
+.ifndef sizeof(i16) const sizeof(i16) 2 end .end
+.ifndef sizeof(i32) const sizeof(i32) 4 end .end
+.ifndef sizeof(i64) const sizeof(i64) 8 end .end
+.ifndef sizeof(isize) const sizeof(isize) 8 end .end

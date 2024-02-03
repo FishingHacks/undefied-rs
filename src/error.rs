@@ -23,7 +23,7 @@ pub fn not_enough_types(loc: &Loc, types_expected: u8, types_actual: usize) -> !
 }
 
 pub fn check_type_mismatch(loc: &Loc, type_expected: &Type, type_actual: &Type) {
-    if !type_expected.equal_to(type_actual) {
+    if !type_expected.equal_to(type_actual) && !(matches!(type_expected, Type::Ptr) && matches!(type_actual, Type::PtrTo(..))) {
         println!("\x1b[31;1merror\x1b[39;22m: {loc}: Expected {type_expected}, but found {type_actual}\n");
         __exit!();
     }

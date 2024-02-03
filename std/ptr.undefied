@@ -1,9 +1,25 @@
 inline fn ptr+ ptr int -- ptr in
-    .param __supports_linux__ assembly ptr int -- ptr in "pop rax" "pop rbx" "add rax, rbx" "push rax" end
+    .param __supports_linux__
+    .param __supports_skyvm__
+    assembly ptr int -- int int  in end + cast(ptr)
 end
 
 inline fn +ptr int ptr -- ptr in
-    .param __supports_linux__ assembly int ptr -- ptr in "pop rax" "pop rbx" "add rax, rbx" "push rax" end
+    .param __supports_linux__
+    .param __supports_skyvm__
+    assembly int ptr -- int int in end + cast(ptr)
+end
+
+inline fn ptr- ptr int -- ptr in
+    .param __supports_linux__
+    .param __supports_skyvm__
+    assembly ptr int -- int int in end + cast(ptr)
+end
+
+inline fn -ptr int ptr -- ptr in
+    .param __supports_linux__
+    .param __supports_skyvm__
+    assembly int ptr -- int int in end + cast(ptr)
 end
 
 const sizeof(ptr) 8 end

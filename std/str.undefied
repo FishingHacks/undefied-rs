@@ -1,6 +1,11 @@
 include "@std"
 include "@uint"
 
+struct Str
+    content ptr
+    len usize ptr-to
+end
+
 fn str::store int ptr ptr in
     over cast(int) over !64 swap drop
     swap cast(int) swap
@@ -9,8 +14,8 @@ fn str::store int ptr ptr in
 end
 
 fn str::print ptr in
-    dup @64 cast(ptr)
-    swap 8 ptr+ @8 swap cast(ptr) puts
+    dup @Str.content
+    swap @Str.len puts
 end
 
 fn str::eq int ptr int ptr -- bool in
@@ -23,12 +28,13 @@ fn str::eq int ptr int ptr -- bool in
     
 
     0 while over over u> do
-        dup ptra +ptr @8
-        over ptrb +ptr @8
+        dup ptra @64 +ptr @8
+        over ptrb @64 +ptr @8
         != if drop drop false return end
         1 +
     end drop drop
     true
 end
 
-const sizeof(str) 9 end
+new_type char 1
+const sizeof(char) 1 end

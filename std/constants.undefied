@@ -1,0 +1,12 @@
+.ifndef true const true 1 cast(bool) end .end
+.ifndef false const false 0 cast(bool) end .end
+.ifndef sizeof(u8) const sizeof(u8) 1 end .end
+.ifndef sizeof(i8) const sizeof(i8) 1 end .end
+.ifndef sizeof(u16) const sizeof(u16) 2 end .end
+.ifndef sizeof(i16) const sizeof(i16) 2 end .end
+.ifndef sizeof(u32) const sizeof(u32) 4 end .end
+.ifndef sizeof(i32) const sizeof(i32) 4 end .end
+.ifndef sizeof(u64) const sizeof(u64) 8 end .end
+.ifndef sizeof(i64) const sizeof(i64) 8 end .end
+.ifndef sizeof(char) const sizeof(char) 1 end .end
+.ifndef null const null 0 end .end

@@ -1,21 +1,27 @@
 use std::{fmt::Display, str::Chars};
 
-use crate::{error::err, utils::get_stdpath};
+use crate::{error::err, utils::get_stdpath, GlobalString};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Loc {
     pub line: usize,
     pub char: usize,
-    pub file: String,
+    pub file: GlobalString,
 }
 
 impl Loc {
     pub fn new(file: &String, line: usize, char: usize) -> Self {
+        let file = GlobalString::new(file);
+        
         Self {
             line,
             char,
-            file: file.clone(),
+            file,
         }
+    }
+
+    pub fn from_gstring(file: GlobalString, line: usize, char: usize) -> Self {
+        Self { char, file, line }
     }
 }
 
@@ -23,7 +29,7 @@ impl Display for Loc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut stdpath = get_stdpath().to_str().unwrap().to_string();
         stdpath += "/";
-        let file = self.file.replace(&stdpath, "@");
+        let file = self.file.get().replace(&stdpath, "@");
         
         f.write_fmt(format_args!("{}:{}:{}", file, self.line, self.char))
     }
@@ -134,6 +140,13 @@ impl Token {
         }
     }
 
+    pub fn as_int_token(&self) -> Option<&IntegerToken> {
+        match self {
+            Self::IntegerToken(a) => Some(a),
+            _ => None,
+        }
+    }
+
     pub fn as_word_token(&self) -> Option<&WordToken> {
         match self {
             Self::WordToken(a) => Some(a),
@@ -170,6 +183,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
             v
         }
     });
+    let file = GlobalString::new(file);
 
     let mut tokens: Vec<Token> = Vec::new();
     let mut value: String = String::new();
@@ -188,7 +202,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
             if is_rec_str && is_escape {
                 if is_rec_char && !value.is_empty() {
                     err(
-                        &Loc::new(file, l_idx, c_idx),
+                        &Loc::from_gstring(file, l_idx, c_idx),
                         "A character has to have exactly 1 character",
                     );
                 }
@@ -209,7 +223,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
             } else if is_rec_str && c != '\'' && is_rec_char {
                 if !value.is_empty() {
                     err(
-                        &Loc::new(file, l_idx, c_idx),
+                        &Loc::from_gstring(file, l_idx, c_idx),
                         "A character has to have exactly 1 character",
                     );
                 }
@@ -221,7 +235,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
                 continue;
             } else if c == '#' {
                 tokens.push(Token::comment_token(
-                    Loc::new(file, l_idx, c_idx),
+                    Loc::from_gstring(file, l_idx, c_idx),
                     l.len() - c_idx,
                 ));
                 break;
@@ -229,7 +243,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
                 if value.is_empty() {
                     continue;
                 }
-                let loc = Loc::new(file, l_idx, c_idx - value.len());
+                let loc = Loc::from_gstring(file, l_idx, c_idx - value.len());
                 if let Some(num) = try_parse_num(&value) {
                     tokens.push(Token::int_token(loc, num));
                 } else {
@@ -239,7 +253,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
             } else if c == '"' && (!is_rec_str || !is_rec_char) {
                 if is_rec_str && !is_rec_char {
                     tokens.push(Token::str_token(
-                        Loc::new(file, l_idx, c_idx - value.len()),
+                        Loc::from_gstring(file, l_idx, c_idx - value.len()),
                         value.clone(),
                         false,
                     ));
@@ -277,7 +291,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
                 let char_amount = value.chars().count();
                 if char_amount != 1 {
                     err(
-                        &Loc::new(file, l_idx - if char_amount > 0 {char_amount - 1} else { 0 }, c_idx),
+                        &Loc::from_gstring(file, l_idx - if char_amount > 0 {char_amount - 1} else { 0 }, c_idx),
                         format!(
                             "A character has to have exactly 1 character, but found {} characters instead",
                             value.len()
@@ -285,7 +299,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
                     );
                 }
                 if let Some(char) = first_char {
-                    tokens.push(Token::char_token(Loc::new(file, l_idx, c_idx - 2), char));
+                    tokens.push(Token::char_token(Loc::from_gstring(file, l_idx, c_idx - 2), char));
                 }
                 is_rec_str = false;
                 is_rec_char = false;
@@ -305,7 +319,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
         if l.is_empty() {
             continue;
         }
-        let loc = Loc::new(file, l_idx, l.chars().count() - value.len());
+        let loc = Loc::from_gstring(file, l_idx, l.chars().count() - value.len());
         if is_rec_char {
             err(&loc, "Expected `'`, but found a new line")
         } else if is_rec_str {
@@ -325,7 +339,7 @@ pub fn parse(tokens: String, file: &String) -> Vec<Token> {
     tokens
 }
 
-fn try_parse_num(value: &str) -> Option<u64> {
+pub fn try_parse_num(value: &str) -> Option<u64> {
     if value.is_empty() {
         return None;
     }
@@ -343,7 +357,7 @@ fn try_parse_num(value: &str) -> Option<u64> {
     }
 }
 
-fn try_parse_int(value: &str) -> Option<u64> {
+pub fn try_parse_int(value: &str) -> Option<u64> {
     let mut int: u64 = 0;
     for v in value.chars() {
         int *= 10;
@@ -364,10 +378,13 @@ fn try_parse_num_hex(value: &str) -> Option<u64> {
     let mut int: u64 = 0;
     for v in take_elements(value.chars()) {
         int *= 0x10;
-        if !('0'..='f').contains(&v) {
+        if ('0'..='9').contains(&v) {
+            int += (v as u64) - ('0' as u64);
+        } else if ('a'..='f').contains(&v) {
+            int += (v as u64) - ('a' as u64) + 0xa;
+        } else {
             return None;
         }
-        int += (v as u64) - ('0' as u64);
     }
     Some(int)
 }

@@ -1,8 +1,25 @@
+new_type u8 1
+new_type u16 2
+new_type u32 4
+new_type u64 8
+type usize u64 end
+
+.ifndef sizeof(u8) const sizeof(u8) 1 end .end
+.ifndef u8::MAX const u8::MAX 0xff end .end
+.ifndef sizeof(u16) const sizeof(u16) 2 end .end
+.ifndef u16::MAX const u16::MAX 0xffff end .end
+.ifndef sizeof(u32) const sizeof(u32) 4 end .end
+.ifndef u32::MAX const u32::MAX 0xffffffff end .end
+.ifndef sizeof(u64) const sizeof(u64) 8 end .end
+.ifndef u64::MAX const u64::MAX 0xffffffffffffffff end .end
+.ifndef sizeof(usize) const sizeof(usize) 8 end .end
+.ifndef usize::MAX const usize::MAX 0xffffffffffffffff end .end
+
 inline fn uprint int in print end
 
-fn u< int int -- bool in
-    .param __supports_linux__
-    assembly int int -- bool in
+inline fn __uint::u< in
+    .param __supports_x86_64__
+    assembly any any -- bool in
         "    mov rcx, 0"
         "    mov rdx, 1"
         "    pop rbx"
@@ -13,9 +30,9 @@ fn u< int int -- bool in
     end
 end
 
-fn u<= int int -- bool in
-    .param __supports_linux__
-    assembly int int -- bool in
+inline fn __uint::u<= in
+    .param __supports_x86_64__
+    assembly any any -- bool in
         "    mov rcx, 0"
         "    mov rdx, 1"
         "    pop rbx"
@@ -26,9 +43,9 @@ fn u<= int int -- bool in
     end
 end
 
-fn u> int int -- bool in
-    .param __supports_linux__    
-    assembly int int -- bool in
+inline fn __uint::u> in
+    .param __supports_x86_64__    
+    assembly any any -- bool in
         "    mov rcx, 0"
         "    mov rdx, 1"
         "    pop rbx"
@@ -39,9 +56,9 @@ fn u> int int -- bool in
     end
 end
 
-fn u>= int int -- bool in
-    .param __supports_linux__
-    assembly int int -- bool in
+inline fn __uint::u>= in
+    .param __supports_x86_64__
+    assembly any any -- bool in
         "    mov rcx, 0"
         "    mov rdx, 1"
         "    pop rbx"
@@ -51,3 +68,52 @@ fn u>= int int -- bool in
         "    push rcx"
     end
 end
+
+fn u8::>= u8 u8 -- bool in __uint::u>= end
+fn u8::> u8 u8 -- bool in __uint::u> end
+fn u8::<= u8 u8 -- bool in __uint::u<= end
+fn u8::< u8 u8 -- bool in __uint::u< end
+fn u8::= u8 u8 -- bool in = end
+fn u8::!= u8 u8 -- bool in != end
+fn @u8 u8 ptr-to -- u8 in @ end
+fn !u8 u8 u8 ptr-to in ! end
+inline fn cast(u8) any -- u8 in .param empty_asm assembly any -- u8 in end end
+fn u8::new int -- u8 in u8::MAX and cast(u8) end
+
+fn u16::>= u16 u16 -- bool in __uint::u>= end
+fn u16::> u16 u16 -- bool in __uint::u> end
+fn u16::<= u16 u16 -- bool in __uint::u<= end
+fn u16::< u16 u16 -- bool in __uint::u< end
+fn u16::= u16 u16 -- bool in = end
+fn u16::!= u16 u16 -- bool in != end
+fn @u16 u16 ptr-to -- u16 in @ end
+fn !u16 u16 u16 ptr-to in ! end
+inline fn cast(u16) any -- u16 in .param empty_asm assembly any -- u16 in end end
+fn u16::new int -- u16 in u16::MAX and cast(u16) end
+
+fn u32::>= u32 u32 -- bool in __uint::u>= end
+fn u32::> u32 u32 -- bool in __uint::u> end
+fn u32::<= u32 u32 -- bool in __uint::u<= end
+fn u32::< u32 u32 -- bool in __uint::u< end
+fn u32::= u32 u32 -- bool in = end
+fn u32::!= u32 u32 -- bool in != end
+fn @u32 u32 ptr-to -- u32 in @ end
+fn !u32 u32 u32 ptr-to in ! end
+inline fn cast(u32) any -- u32 in .param empty_asm assembly any -- u32 in end end
+fn u32::new int -- u32 in u32::MAX and cast(u32) end
+
+fn u64::>= u64 u64 -- bool in __uint::u>= end
+fn u64::> u64 u64 -- bool in __uint::u> end
+fn u64::<= u64 u64 -- bool in __uint::u<= end
+fn u64::< u64 u64 -- bool in __uint::u< end
+fn u64::= u64 u64 -- bool in = end
+fn u64::!= u64 u64 -- bool in != end
+fn @u64 u64 ptr-to -- u64 in @ end
+fn !u64 u64 u64 ptr-to in ! end
+inline fn cast(u64) any -- u64 in .param empty_asm assembly any -- u64 in end end
+fn u64::new int -- u64 in u64::MAX and cast(u64) end
+
+undef __uint::u>=
+undef __uint::u>
+undef __uint::u<=
+undef __uint::u<

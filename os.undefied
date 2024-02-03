@@ -1,0 +1,68 @@
+include "@skyvm/str"
+include "@skyvm/std"
+include "@skyvm/io"
+
+fn iputs int in
+    while dup 0 > do
+        10 /%
+        '0' + putchar
+    end drop
+end
+
+memory len 4 end
+memory chars 8 100 * end
+
+inline fn print_dollar ptr -- ptr in
+    '$' over !8
+    ' ' over !8
+end
+
+
+fn run_cmd int ptr in
+    over over "quit" str::eq if hlt
+    else over 5 int::min over "echo " str::eq if*
+        over 5 - over cast(int) 5 + cast(ptr) puts
+        '\n' putchar
+    else end
+
+    "\n\nYou typed: |" puts puts '|' putchar
+end
+
+fn cmdline_input ptr in
+    print_dollar
+    while true do
+        dup @8
+        dup 8 = if
+            # uartptr
+            len @32 0 > if
+                len @32 dec len !32
+
+                over !8
+                ' ' over !8
+                8 over !8
+            else drop end
+        else dup 10 = if*
+            over !8
+
+
+            len @32 chars run_cmd
+
+            0 len !32
+
+            '\n' over !8
+            print_dollar
+        else dup 0 != if*
+            dup
+            chars cast(int) len @32 + cast(ptr) !8
+            len @32 inc len !32
+            over !8
+        else drop end
+    end
+    drop
+end
+
+fn main in
+    AttachmentType::Uart get_attachment_addr cast(ptr) cmdline_input
+    # @8 drop "abc" lnputs
+    hlt
+end

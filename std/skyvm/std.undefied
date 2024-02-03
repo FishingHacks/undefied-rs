@@ -1,0 +1,240 @@
+inline fn hlt in
+    .param __supports_skyvm__ assembly in "hlt" end
+end
+
+inline fn exit in
+    .param __supports_skyvm__ assembly in "hlt" end
+end
+
+inline fn !rax int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rax"
+    end
+end
+
+inline fn @rax -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rax"
+    end
+end
+inline fn !rbx int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rbx"
+    end
+end
+inline fn @rbx -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rbx"
+    end
+end
+inline fn !rcx int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rcx"
+    end
+end
+inline fn @rcx -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rcx"
+    end
+end
+inline fn !rdi int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rdi"
+    end
+end
+inline fn @rdi -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rdi"
+    end
+end
+inline fn !rsi int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rsi"
+    end
+end
+inline fn @rsi -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rsi"
+    end
+end
+inline fn !r10 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r10"
+    end
+end
+inline fn @r10 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r10"
+    end
+end
+inline fn !r9 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r9"
+    end
+end
+inline fn @r9 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r9"
+    end
+end
+inline fn !r8 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r8"
+    end
+end
+inline fn @r8 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r8"
+    end
+end
+inline fn !r7 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r7"
+    end
+end
+inline fn @r7 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r7"
+    end
+end
+inline fn !r6 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r6"
+    end
+end
+inline fn @r6 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r6"
+    end
+end
+inline fn !r5 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r5"
+    end
+end
+inline fn @r5 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r5"
+    end
+end
+inline fn !r4 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r4"
+    end
+end
+inline fn @r4 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r4"
+    end
+end
+inline fn !r3 int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %r3"
+    end
+end
+inline fn @r3 -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %r3"
+    end
+end
+inline fn !rsp int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rsp"
+    end
+end
+inline fn @rsp -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rsp"
+    end
+end
+inline fn !flags int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %flags"
+    end
+end
+inline fn @flags -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %flags"
+    end
+end
+inline fn !rip int in
+    .param __supports_skyvm__
+    assembly int in
+        "pop %rip"
+    end
+end
+inline fn @rip -- int in
+    .param __supports_skyvm__
+    assembly -- int in
+        "pash %rip"
+    end
+end
+
+const busInfo 0xffffffff 3 - cast(ptr) end
+const AttachmentNotAttached 0xffffffff end
+
+const AttachmentType::Memory 1 offset end
+const AttachmentType::Uart 1 offset end
+const AttachmentType::SimpleMemoryProtections 1 offset end
+
+const AttachmentType::len offset reset end
+
+.log busInfo
+
+fn get_attachment_addr int -- int in
+    busInfo !8
+
+    busInfo @32
+    
+    # cast(int)
+end
+
+inline fn inc int -- int in
+    .param __supports_skyvm__
+    assembly in "pop %rax" "inc %rax" "push %rax" end
+end
+
+inline fn dec int -- int in
+    .param __supports_skyvm__
+    assembly in "pop %rax" "dec %rax" "push %rax" end
+end
+
+inline fn needs_attachment int in
+    get_attachment_addr AttachmentNotAttached = if hlt end
+end
+
+fn int::min int int -- int in
+    over over > if
+        swap
+    end drop
+end

@@ -1,11 +1,6 @@
 include "@io"
-include "@std"
-include "@errors"
+include "@uint"
 
 fn main in
-    # this syscall will fail:
-    "abc" 25 fputs
-    errno swap
-    "Return Value: " puts iprint # prints -1 for failures, otherwise the return value
-    "ERRNO: " puts iprint # prints the error number
+    "main\n" puts
 end
