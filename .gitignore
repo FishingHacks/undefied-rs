@@ -1,4 +1,6 @@
 /target
-index
 *.asm
 std/*/assembler
+/vm
+/a
+/*.bin

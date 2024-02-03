@@ -690,7 +690,7 @@ reset (const only)
 
 UTC means UTC+0
 
-A version looks like this: `major.minor.patchlevel`. For `1.2.5` that means that the major is 1, the minor 2 and the patchlevel 5.
+A version looks like this: `major.minor`. For `1.2` that means that the major is 1 and the minor 2.
 
 | Name                        |                                                  Value |
 | :-------------------------- | -----------------------------------------------------: |
@@ -714,11 +714,14 @@ A version looks like this: `major.minor.patchlevel`. For `1.2.5` that means that
 | `__TIME_MILLISECONDS__`     |    The Milliseconds at compilation (timezone adjusted) |
 | `__UNDEFIED_MAJOR__`        |                             The Compiler Version major |
 | `__UNDEFIED_MINOR__`        |                             The Compiler Version minor |
-| `__UNDEFIED_PATCHLEVEL__`   |                       The Compiler Version patch level |
-| `__OPTIMIZATIONS__`         |   The Optimization level it got compiled with (0 or 1) |
 | `__TYPECHECK__`             |        Set to true, when run in typechecking only mode |
 | `__TARGET__`                |                    Set to the id of the current target |
 | `__TARGET_LINUX__`          |                      Set to the id of the linux target |
+| `__TARGET_SKYVM__`          |                      Set to the id of the skyvm target |
+
+**Note**
+
+The rust compiler does not support anything time related but `__UNIXTIME__` yet
 
 **Note**
 
@@ -782,5 +785,7 @@ $ undefied com main.undefied -DPLATFORM=4
 | :-------------------------- | ------------------------------------------------------------: |
 | `__UNDEFIED_VERSION__`      |           The compiler version during compilation as a string |
 | `__UNDEFIED_VERSION_CSTR__` |          The compiler version during compilation as a cstring |
-| `__BASE_FILE__`             |  The file that the compilation command was run on as a string |
-| `__BASE_FILE_CSTR__`        | The file that the compilation command was run on as a cstring |
+| `__BASE_FILE_STR__`        | The file that the compilation command was run on as a cstring |
+| `__BASE_FILE_CSTR__`        |  The file that the compilation command was run on as a string |
+| `__TARGET_STR__`            |                            The name of the target as a string |
+| `__TARGET_CSTR__`           |                           The name of the target as a cstring |

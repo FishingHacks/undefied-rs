@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, os::unix::fs::FileExt, process::Command};
+use std::{fs::{remove_file, File}, io::{Read, Write}, os::unix::fs::FileExt, path::PathBuf, process::Command};
 
 use crate::{
     error::{err, err_generic, Log},
@@ -44,7 +44,7 @@ fn syscall(mut num: u8) -> String {
     str
 } */
 
-pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
+pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io::Result<()> {
     let mut str: String = String::with_capacity(1000);
     str.push_str(START);
 
@@ -258,7 +258,7 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
                         str += "push %rax\n";
                     }
 
-                    Intrinsic::Load | Intrinsic::Store => unreachable!(),
+                    Intrinsic::Load | Intrinsic::Store => err(&loc, "@ and ! intrinsics aren't supported for no typechecking"),
                     
                     Intrinsic::Load8 => {
                         str += ";; @8\n";
@@ -502,16 +502,32 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
         str += &format!("#memory mem_{} {}\n", id, sz);
     }
 
-    let mut f = File::create("default.asm")?;
+    let mut out_name = path.file_stem().expect("No file name found").to_str().expect("The file to compile is not valid").to_string();
+    out_name.push_str(".asm");
+
+    let mut f = File::create(&out_name)?;
     f.write_all_at(str.as_bytes(), 0)?;
+
+    for file in &config.asm_files_to_include {
+        let mut file = File::open(file)?;
+        loop {
+            let mut arr = [0_u8; 4096];
+            let read = file.read(&mut arr)?;
+            if read < 1 {
+                break;
+            }
+            f.write(&arr[0..read])?;
+        }
+    }
+
     f.flush()?;
     drop(f);
-
+    
     let mut execpath = get_stdpath();
     execpath.push("skyvm");
     execpath.push("assembler");
     let cmd = Command::new(&execpath)
-        .args(["default.asm"])
+        .args([out_name])
         .log()
         .output()
         .expect("Failed to execute process");
@@ -519,6 +535,14 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
     unsafe {
         println!("{}", String::from_utf8_unchecked(cmd.stdout));
         println!("{}", String::from_utf8_unchecked(cmd.stderr));
+    }
+
+    if !config.keep_files {
+        remove_file("default.asm")?;
+    }
+
+    if config.library_link_paths.len() > 0 || config.library_links.len() > 0 || config.run_after_compilation {
+        println!("SkyVM does not support library links or run-after-compilation!");
     }
 
     Ok(())

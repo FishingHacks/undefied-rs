@@ -1,19 +1,17 @@
-use std::{
-    fs::{remove_file, File},
-    io::Write,
-    os::unix::fs::FileExt,
-    process::{Command, Stdio},
-};
+use std::fs::{remove_file, File};
+use std::io::{Read, Write};
+use std::os::unix::fs::FileExt;
+use std::path::PathBuf;
+use std::process::Command;
 
-use crate::{
-    error::{err, err_generic, Log},
-    parser::{
-        CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program,
-        PushAssembly, PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret,
-    },
-    typecheck::Type,
-    utils::iota, Config,
+use crate::error::{err, err_generic, Log};
+use crate::parser::{
+    CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program, PushAssembly,
+    PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret,
 };
+use crate::typecheck::Type;
+use crate::utils::iota;
+use crate::Config;
 
 const START: &str = r#"BITS 64
 segment .text
@@ -89,7 +87,7 @@ fn syscall(mut num: u8) -> String {
 
 pub const ARGS_REGS: &[&str] = &["rdi", "rsi", "rdx", "r8", "r9"];
 
-pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
+pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io::Result<()> {
     let mut str: String = String::with_capacity(1000);
     str.push_str(START);
 
@@ -140,11 +138,11 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
             str += "    ;; -- call run functions --\n";
             str += "    mov rax, rsp\n";
             str += "    mov rsp, [ret_stack_rsp]\n";
-            
+
             for id in &program.run_functions {
                 str += &format!("    call addr_{}\n", *id);
             }
-            
+
             str += "    ;; -- call main --\n";
         } else {
             str += "    ;; -- call main --\n";
@@ -164,16 +162,15 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
         }
         str += "    syscall\n";
     } else {
-
         if !config.no_run_fns && program.run_functions.len() > 0 {
             str += "    ;; -- call run functions --\n";
             str += "    mov rax, rsp\n";
             str += "    mov rsp, [ret_stack_rsp]\n";
-            
+
             for id in &program.run_functions {
                 str += &format!("    call addr_{}\n", *id);
             }
-            
+
             str += "    mov [ret_stack_rsp], rsp\n";
             str += "    mov rsp, rax\n";
         }
@@ -368,7 +365,10 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
                         str += "    push rax\n";
                     }
 
-                    Intrinsic::Load | Intrinsic::Store => unreachable!(),
+                    Intrinsic::Load | Intrinsic::Store => err(
+                        &loc,
+                        "@ and ! intrinsics aren't supported for no typechecking",
+                    ),
 
                     Intrinsic::Load8 => {
                         str += "    ;; @\n";
@@ -641,54 +641,87 @@ pub fn compile(mut program: Program, config: &Config) -> std::io::Result<()> {
 
     let mut f = File::create("_.asm")?;
     f.write_all_at(str.as_bytes(), 0)?;
+
+    for file in &config.asm_files_to_include {
+        let mut file = File::open(file)?;
+        loop {
+            let mut arr = [0_u8; 4096];
+            let read = file.read(&mut arr)?;
+            if read < 1 {
+                break;
+            }
+            f.write(&arr[0..read])?;
+        }
+    }
+
     f.flush()?;
     drop(f);
-
+    
+    let out_name = path.file_stem().expect("No file name found").to_str().expect("The file to compile is not valid");
+    
     unsafe {
-        println!(
-            "{}",
-            String::from_utf8_unchecked(
-                Command::new("nasm")
-                    .args(["-g", "-felf64", "-o", "_.o", "_.asm"])
-                    .log()
-                    .output()
-                    .expect("Failed to execute process")
-                    .stdout
-            )
-        );
+        let assembler = Command::new("nasm")
+            .args(["-g", "-felf64", "-o", "_.o", "_.asm"])
+            .log()
+            .output()
+            .expect("Failed to execute process");
 
-        println!(
-            "{}",
-            String::from_utf8_unchecked(
-                Command::new("ld")
-                    .args(["-o", "index", "_.o"])
-                    .log()
-                    .output()
-                    .expect("Failed to execute process")
-                    .stdout
-            )
-        );
+        println!("{}", String::from_utf8_unchecked(assembler.stdout));
+
+        if !assembler.status.success() {
+            err_generic(format!(
+                "Failed to run the assembler!\n\n{}",
+                String::from_utf8_unchecked(assembler.stderr)
+            ));
+        }
+
+
+        let mut linker_args = vec!["-o", out_name];
+
+        for path in &config.library_link_paths {
+            linker_args.push("-L");
+            linker_args.push(path.to_str().expect("A path in the link-path argument did not have a valid folder path"));
+        }
+        for path in &config.library_links {
+            linker_args.push("-l");
+            linker_args.push(path);
+        }
+
+        if config.create_shared {
+            linker_args.push("--shared");
+        }
+
+        linker_args.push("_.o");
+        let linker = Command::new("ld")
+            .args(linker_args)
+            .log()
+            .output()
+            .expect("Failed to execute process");
+
+        println!("{}", String::from_utf8_unchecked(linker.stdout));
+
+        if !linker.status.success() {
+            err_generic(format!(
+                "Failed to run the linker!\n\n{}",
+                String::from_utf8_unchecked(linker.stderr)
+            ));
+        }
     }
 
-    // remove_file("_.asm").expect("Failed to remove _.asm file (compilation artifact)");
-    remove_file("_.o").expect("Failed to remove _.o file (compilation artifact)");
-
-    let child = Command::new("./index")
-        .log()
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("Failed to launch child")
-        .wait_with_output()
-        .expect("couldnt get output");
-
-    unsafe {
-        println!("{}", String::from_utf8_unchecked(child.stdout));
-        println!("{}", String::from_utf8_unchecked(child.stderr));
+    if !config.keep_files {
+        // remove_file("_.asm").expect("Failed to remove _.asm file (compilation artifact)");
+        remove_file("_.o").expect("Failed to remove _.o file (compilation artifact)");
     }
 
-    println!("Program exited with {}", child.status);
+    if config.run_after_compilation {
+        let child = Command::new(format!("./{}", out_name))
+            .log()
+            .spawn()
+            .expect("Failed to launch child")
+            .wait()?;
+
+        println!("Program exited with {}", child);
+    }
 
     Ok(())
 }

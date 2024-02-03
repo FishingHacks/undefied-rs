@@ -13,7 +13,7 @@ use crate::{
     error::err,
     tokenizer::{Loc, StringToken, Token},
 };
-use crate::{Config, GlobalString};
+use crate::{Config, GlobalString, PredefValue};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Intrinsic {
@@ -1169,6 +1169,24 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
     let mut structs = Structs::default();
     let mut type_aliases: HashMap<String, (Type, bool)> = HashMap::default();
 
+    // #####################################
+    // #                                   #
+    // #    I N S E R T   P R E D E F S    #
+    // #                                   #
+    // #####################################
+
+    let loc = Loc::from_gstring(GlobalString::from_static("<built-in>"), 0, 0);
+    for (name, predef) in &config.predefined {
+        match predef {
+            PredefValue::Constant(v) => consts.insert(name.clone(), Constant::new(*v, loc, Type::Int)).map(|_| {}),
+            PredefValue::ConstantBool(v) => consts.insert(name.clone(), Constant::new(if *v { 1 } else { 0 }, loc, Type::Bool)).map(|_| {}),
+            PredefValue::String(v) => inline_procs.insert(name.clone(), vec![Token::str_token(loc, v.clone(), false)]).map(|_| {}),
+            PredefValue::CString(v) => inline_procs.insert(name.clone(), vec![Token::str_token(loc, v.clone(), true)]).map(|_| {}),
+        };
+    }
+
+
+    
     let mut ip: usize = 0;
     let mut nesting: u64 = 0;
     let mut current_fn: Option<usize> = None;

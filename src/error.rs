@@ -106,3 +106,7 @@ pub fn err_generic<S: Into<String>>(str: S) -> ! {
     eprintln!("\x1b[31;1merror\x1b[39;22m: {}", str.into());
     __exit!();
 }
+
+pub fn info_generic<T: Into<String>>(str: T) {
+    println!("\x1b[32;1minfo\x1b[39;22m: {}", str.into());
+}
