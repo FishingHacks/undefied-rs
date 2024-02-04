@@ -1,42 +1,15 @@
+use clap::{
+    builder::PathBufValueParser, crate_authors, crate_name, Arg, ArgAction, Command, ValueHint,
+};
+use error::err_generic;
+use parser::AttributeList;
 /**
  * ROADMAP:
  * - impl predef consts (time)
  * - call convention (!!!)
- * - cmdline:
- *     - <option>
- *         -h, --help: print help
- *         -v, --version: get the current version
- *     
- *     - undefied com/compile filename.undefied [options]
- *         -r, --run: run the program after compilation
- *         -u, --unsafe: disable typechecking
- *         -o, --optimizations [0 | 1]: disable optimizations
- *         --keep: generate .asm and .o files
- *         -t, --target <target>: Set the compilation target
- *         -i <file>, --include <file>: include a .undefied or .asm file
- *         -l <name>, --link <name>: link to a library
- *         -L <path>, --link-path <path>: specify a path the linker should look in
- *         --shared: Generate a shared library file (.so file)
- *         -d <constant> <value>, --define <constant> <value>: Define a constant set to a value
- *         -m <name> <value>, --macro <name> <value>: Set a macro to a value (str)
- *         -M <name> <value>, --cmacro <name> <value>: Set a macro to a value (cstr)
- *         -S, --no-sideeffects, --no-run-fns: Do not run functions marked with .param __run_function__
- *         -F, --global-functions, --no-inline: disable function inlining
- *
- *     - undefied check/typecheck [options] filename.undefied
- *         -t, --target <target>: Set the compilation target
- *         -D<constant>=<value>, --define <constant> <value>: Define a constant set to a value
- *         -m <name> <value>, --macro <name> <value>: Set a macro to a value (str)
- *         -M <name> <value>, --cmacro <name> <value>: Set a macro to a value (cstr)
- *         -F, --global-functions, --no-inline: disable function inlining
- *
- *     - undefied config config-file
- *         config file type: JSON or TOML
- *         should include all options passed to compile
  */
 use std::{
     collections::HashMap,
-    ffi::OsStr,
     fmt::{Arguments, Debug, Display},
     fs::read_to_string,
     hash::Hash,
@@ -44,13 +17,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use clap::{
-    builder::{PathBufValueParser, TypedValueParser, ValueParser},
-    crate_authors, crate_name, value_parser, Arg, ArgAction, Command, Parser, ValueHint,
-};
-use error::err_generic;
-use parser::AttributeList;
+use toml::Table;
 
 use crate::{error::info_generic, tokenizer::try_parse_num};
 
@@ -675,18 +642,272 @@ fn main() {
         info_generic("Finished typechecking with no errors");
         return;
     } else if let Some(matches) = matches.subcommand_matches("config") {
-        todo!()
+        let path = matches.get_one::<PathBuf>("file").unwrap();
+
+        let is_json = match path.extension().and_then(|f| f.to_str()) {
+            Some("json") => true,
+            Some("toml") => false,
+            Some(ext) => err_generic(format!("file type {} is not supported", ext)),
+            _ => err_generic("A file with that extension is not supported"),
+        };
+
+        let contents = deal_with_error(
+            format_args!("Could not read file {}: ", path.display()),
+            read_to_string(path),
+        );
+
+        if is_json {
+            let table: serde_json::Map<String, serde_json::Value> = deal_with_error(
+                format_args!("Could not parse json value: "),
+                serde_json::from_str(&contents),
+            );
+
+            let mut config = Config::default(
+                match table
+                    .get("target")
+                    .and_then(|f| f.as_str())
+                    .and_then(|f| CompilationTarget::from_str(f))
+                {
+                    Some(v) => v,
+                    None => err_generic("Could not find the target field"),
+                },
+            );
+
+            let file = match table.get("file").and_then(|f| f.as_str()) {
+                Some(v) => PathBuf::from(v),
+                None => err_generic("Could not find the target file"),
+            };
+
+            macro_rules! get_bool {
+                ($table: expr, $value: expr) => {
+                    $table
+                        .get($value)
+                        .and_then(|f| f.as_bool())
+                        .unwrap_or(false)
+                };
+            }
+
+            config.run_after_compilation = get_bool!(table, "run");
+            config.no_inline =
+                get_bool!(table, "no-inline") || get_bool!(table, "global-functions");
+            config.create_shared = get_bool!(table, "shared");
+            config.no_run_fns =
+                get_bool!(table, "no-sideeffects") || get_bool!(table, "no-run-functions");
+            config.keep_files = get_bool!(table, "keep");
+            config.no_typechecking = get_bool!(table, "unsafe");
+
+            if let Some(value) = table.get("optimizations") {
+                if let serde_json::Value::Number(v) = value {
+                    if let Some(v) = v.as_u64() {
+                        if v as usize >= OPTIMIZATION_LEVELS.len() {
+                            err_generic(format!(
+                                "Optimizations have to be 0..{}",
+                                OPTIMIZATION_LEVELS.len()
+                            ));
+                        }
+                        config.optimizations = OPTIMIZATION_LEVELS[v as usize];
+                    }
+                } else if let serde_json::Value::Object(v) = value {
+                    config.optimizations.dead_code_elimination =
+                        get_bool!(v, "dead_code_elimination");
+                }
+            }
+
+            if let Some(value) = table.get("include") {
+                if let serde_json::Value::Array(include_paths) = value {
+                    for path in include_paths
+                        .iter()
+                        .map(|path| path.as_str().map(|str| PathBuf::from(str)))
+                    {
+                        let path = match path {
+                            Some(v) => v,
+                            _ => continue,
+                        };
+                        match path.extension().and_then(|str| str.to_str()) {
+                            Some("asm") => config.asm_files_to_include.push(path),
+                            Some("undefied") => config.undefied_files_to_include.push(path),
+                            _ => err_generic("Please only include .undefied or .asm files"),
+                        }
+                    }
+                }
+            }
+
+            if let Some(value) = table.get("libraries").and_then(|v| v.as_array()) {
+                config.library_links = value
+                    .iter()
+                    .map(|f| f.as_str().unwrap_or(""))
+                    .filter(|f| f.len() > 0)
+                    .map(|f| f.to_string())
+                    .collect();
+            }
+
+            if let Some(value) = table.get("library_paths").and_then(|v| v.as_array()) {
+                config.library_link_paths = value
+                    .iter()
+                    .map(|f| f.as_str().unwrap_or(""))
+                    .filter(|f| f.len() > 0)
+                    .map(|f| PathBuf::from(f))
+                    .collect();
+            }
+
+            if let Some(constants) = table.get("constants").and_then(|f| f.as_object()) {
+                for (name, value) in constants {
+                    if let serde_json::Value::Number(v) = value {
+                        if let Some(v) = v.as_u64() {
+                            config
+                                .predefined
+                                .insert(name.clone(), PredefValue::Constant(v));
+                        }
+                    }
+                }
+            }
+
+            if let Some(constants) = table.get("macros").and_then(|f| f.as_object()) {
+                for (name, value) in constants {
+                    if let serde_json::Value::String(v) = value {
+                        config
+                            .predefined
+                            .insert(name.clone(), PredefValue::String(v.clone()));
+                    }
+                }
+            }
+
+            if let Some(constants) = table.get("cmacros").and_then(|f| f.as_object()) {
+                for (name, value) in constants {
+                    if let serde_json::Value::String(v) = value {
+                        config
+                            .predefined
+                            .insert(name.clone(), PredefValue::CString(v.clone()));
+                    }
+                }
+            }
+
+            compile(file, config);
+        } else {
+            macro_rules! get_bool {
+                ($table: expr, $value: expr) => {
+                    $table
+                        .get($value)
+                        .and_then(|f| f.as_bool())
+                        .unwrap_or(false)
+                };
+            }
+
+            let table = deal_with_error(
+                format_args!("Could not parse toml: "),
+                contents.parse::<Table>(),
+            );
+            let mut config = if let Some(str) = table["target"].as_str() {
+                let target = CompilationTarget::from_str(str);
+                Config::default(match target {
+                    Some(v) => v,
+                    None => err_generic(format!("Failed to parse target {str}")),
+                })
+            } else {
+                err_generic("the type of the target field is not a string");
+            };
+            let file = match table["file"].as_str() {
+                Some(v) => PathBuf::from(v),
+                None => err_generic("The type of the file field is not a string"),
+            };
+
+            config.run_after_compilation = get_bool!(table, "run");
+            config.no_inline =
+                get_bool!(table, "no-inline") || get_bool!(table, "global-functions");
+            config.create_shared = get_bool!(table, "shared");
+            config.no_run_fns =
+                get_bool!(table, "no-sideeffects") || get_bool!(table, "no-run-functions");
+            config.keep_files = get_bool!(table, "keep");
+            config.no_typechecking = get_bool!(table, "unsafe");
+
+            if let Some(value) = table.get("optimizations") {
+                if let toml::Value::Integer(v) = value {
+                    if *v < 0 || *v as usize >= OPTIMIZATION_LEVELS.len() {
+                        err_generic(format!(
+                            "Optimizations have to be 0..{}",
+                            OPTIMIZATION_LEVELS.len()
+                        ));
+                    }
+                    config.optimizations = OPTIMIZATION_LEVELS[*v as usize];
+                } else if let toml::Value::Table(v) = value {
+                    config.optimizations.dead_code_elimination =
+                        get_bool!(v, "dead_code_elimination");
+                }
+            }
+
+            if let Some(value) = table.get("include") {
+                if let toml::Value::Array(include_paths) = value {
+                    for path in include_paths
+                        .iter()
+                        .map(|path| path.as_str().map(|str| PathBuf::from(str)))
+                    {
+                        let path = match path {
+                            Some(v) => v,
+                            _ => continue,
+                        };
+                        match path.extension().and_then(|str| str.to_str()) {
+                            Some("asm") => config.asm_files_to_include.push(path),
+                            Some("undefied") => config.undefied_files_to_include.push(path),
+                            _ => err_generic("Please only include .undefied or .asm files"),
+                        }
+                    }
+                }
+            }
+
+            if let Some(value) = table.get("libraries").and_then(|v| v.as_array()) {
+                config.library_links = value
+                    .iter()
+                    .map(|f| f.as_str().unwrap_or(""))
+                    .filter(|f| f.len() > 0)
+                    .map(|f| f.to_string())
+                    .collect();
+            }
+
+            if let Some(value) = table.get("library_paths").and_then(|v| v.as_array()) {
+                config.library_link_paths = value
+                    .iter()
+                    .map(|f| f.as_str().unwrap_or(""))
+                    .filter(|f| f.len() > 0)
+                    .map(|f| PathBuf::from(f))
+                    .collect();
+            }
+
+            if let Some(constants) = table.get("constants").and_then(|f| f.as_table()) {
+                for (name, value) in constants {
+                    if let toml::Value::Integer(v) = value {
+                        config
+                            .predefined
+                            .insert(name.clone(), PredefValue::Constant(*v as u64));
+                    }
+                }
+            }
+
+            if let Some(constants) = table.get("macros").and_then(|f| f.as_table()) {
+                for (name, value) in constants {
+                    if let toml::Value::String(v) = value {
+                        config
+                            .predefined
+                            .insert(name.clone(), PredefValue::String(v.clone()));
+                    }
+                }
+            }
+
+            if let Some(constants) = table.get("cmacros").and_then(|f| f.as_table()) {
+                for (name, value) in constants {
+                    if let toml::Value::String(v) = value {
+                        config
+                            .predefined
+                            .insert(name.clone(), PredefValue::CString(v.clone()));
+                    }
+                }
+            }
+
+            compile(file, config);
+        }
     } else {
         let _ = command.print_help();
         return;
     }
-
-    // let mut config: Config = Config::default(CompilationTarget::Linux);
-    // config.optimizations.dead_code_elimination = true;
-
-    // let file = "a.undefied".to_string();
-
-    // compile(file, config);
 }
 
 fn insert_predefs(file_name: &String, config: &mut Config) {
