@@ -7,7 +7,7 @@ use std::process::Command;
 use crate::error::{err, err_generic, Log};
 use crate::parser::{
     CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program, PushAssembly,
-    PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret,
+    PushConst, PushFnPtr, PushInt, PushLocalMem, PushMem, PushStr, Ret,
 };
 use crate::typecheck::Type;
 use crate::utils::iota;
@@ -85,10 +85,26 @@ fn syscall(mut num: u8) -> String {
     str
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CallingConvention {
+    Raw,
+    CStyle,
+}
+
 pub const ARGS_REGS: &[&str] = &["rdi", "rsi", "rdx", "r8", "r9"];
 
 pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io::Result<()> {
     let mut str: String = String::with_capacity(1000);
+
+    for contract in &program.contracts {
+        if contract.1.attributes.has_attribute("__provided_externally__") {
+            let name = contract.1.attributes.get_value("__provided_externally__").unwrap_or(&contract.1.name);
+            str.push_str("extern ");
+            str.push_str(name);
+            str.push('\n');
+        }
+    }
+
     str.push_str(START);
 
     for op in &program.ops {
@@ -423,6 +439,16 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                         str += "    mov [rax], rbx\n";
                     }
 
+                    Intrinsic::CallFnPtr => {
+                        str += "    ;; call\n";
+                        str += "    pop rbx\n";
+                        str += "    mov rax, rsp\n";
+                        str += "    mov rsp, [ret_stack_rsp]\n";
+                        str += "    call rbx\n";
+                        str += "    mov [ret_stack_rsp], rsp\n";
+                        str += "    mov rsp, rax\n";
+                    }
+
                     Intrinsic::CastBool
                     | Intrinsic::CastInt
                     | Intrinsic::CastPtr
@@ -566,12 +592,23 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                 if let Some(name) = externally_provided {
                     let contract = program.contracts.get(id).unwrap();
 
-                    for i in 0..contract.in_types.len().min(ARGS_REGS.len()) {
-                        str += &format!("    pop {}\n", ARGS_REGS[i]);
-                    }
-                    str += &format!("    call {}\n", name);
-                    for i in 0..contract.out_types.len().min(ARGS_REGS.len()) {
-                        str += &format!("    push {}\n", ARGS_REGS[i]);
+                    let convention = match contract.attributes.get_value("__calling_convention__").map(|str| str.as_str()) {
+                        None => err_generic("You have to specify a calling convention"),
+                        Some("C") => CallingConvention::CStyle,
+                        Some("raw") => CallingConvention::Raw,
+                        Some(convention) => err_generic(format!("Calling Convention {convention} is not supported by this target")),
+                    };
+
+                    if convention == CallingConvention::CStyle {
+                        for i in 0..contract.in_types.len().min(ARGS_REGS.len()) {
+                            str += &format!("    pop {}\n", ARGS_REGS[i]);
+                        }
+                        str += &format!("    call {}\n", name);
+                        for i in 0..contract.out_types.len().min(ARGS_REGS.len()) {
+                            str += &format!("    push {}\n", ARGS_REGS[i]);
+                        }
+                    } else if convention == CallingConvention::Raw {
+                        str += &format!("    call {}\n", name);
                     }
                 } else {
                     str += "    mov rax, rsp\n";
@@ -580,6 +617,18 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                     str += "    mov [ret_stack_rsp], rsp\n";
                     str += "    mov rsp, rax\n";
                 }
+            }
+
+            Operation::PushFnPtr(PushFnPtr { contract_id, .. }) => {
+                let contract = program.contracts.get(contract_id).unwrap();
+                let name = if contract.attributes.has_attribute("__provided_externally__") {
+                    contract.attributes.get_value("__provided_externally__").unwrap_or(&contract.name).to_string()
+                } else {
+                    format!("addr_{}", *contract_id)
+                };
+
+                str += "    ;; -- push fn ptr --\n";
+                str += &format!("    push {name}\n");
             }
             Operation::Ret(Ret {
                 dealloc_len,
@@ -656,9 +705,13 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
 
     f.flush()?;
     drop(f);
-    
-    let out_name = path.file_stem().expect("No file name found").to_str().expect("The file to compile is not valid");
-    
+
+    let out_name = path
+        .file_stem()
+        .expect("No file name found")
+        .to_str()
+        .expect("The file to compile is not valid");
+
     unsafe {
         let assembler = Command::new("nasm")
             .args(["-g", "-felf64", "-o", "_.o", "_.asm"])
@@ -675,12 +728,14 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
             ));
         }
 
-
         let mut linker_args = vec!["-o", out_name];
 
         for path in &config.library_link_paths {
             linker_args.push("-L");
-            linker_args.push(path.to_str().expect("A path in the link-path argument did not have a valid folder path"));
+            linker_args.push(
+                path.to_str()
+                    .expect("A path in the link-path argument did not have a valid folder path"),
+            );
         }
         for path in &config.library_links {
             linker_args.push("-l");

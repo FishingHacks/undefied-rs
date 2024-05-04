@@ -21,6 +21,7 @@ pub enum Intrinsic {
     Here,
 
     StructPtrPlus,
+    CallFnPtr,
 
     Plus,
     Minus,
@@ -132,6 +133,8 @@ impl FromStr for Intrinsic {
             "!32" => Ok(Self::Store32),
             "!64" => Ok(Self::Store64),
 
+            "call" => Ok(Self::CallFnPtr),
+
             _ => Err(()),
         }
     }
@@ -189,6 +192,7 @@ impl Intrinsic {
             Self::Store32 => "!32",
             Self::Store64 => "!64",
             Self::StructPtrPlus => "StructPtrPlus<+>",
+            Self::CallFnPtr => "call"
         }
     }
 }
@@ -239,6 +243,11 @@ pub struct PushLocalMem {
     pub loc: Loc,
     pub off: usize,
     pub typ: Type,
+}
+#[derive(Debug, Clone)]
+pub struct PushFnPtr {
+    pub loc: Loc,
+    pub contract_id: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -337,6 +346,7 @@ pub enum Operation {
     Assembly(PushAssembly),
     Typefence(Typefence),
     Cast(Cast),
+    PushFnPtr(PushFnPtr),
     None(Loc),
 }
 
@@ -358,6 +368,7 @@ impl Display for Operation {
             Self::Typefence(..) => "Typefence",
             Self::None(..) => "None",
             Self::Cast(..) => "Cast",
+            Self::PushFnPtr(..) => "PushFnPtr",
         })
     }
 }
@@ -365,6 +376,9 @@ impl Display for Operation {
 impl Operation {
     pub fn intrinsic(loc: Loc, intrinsic: Intrinsic) -> Self {
         Self::Intrinsic(OpIntrinsic { loc, op: intrinsic })
+    }
+    pub fn push_fn_ptr(loc: Loc, contract_id: usize) -> Self {
+        Self::PushFnPtr(PushFnPtr { contract_id, loc })
     }
     pub fn push_str(loc: Loc, value: u64, len: u64, is_cstr: bool) -> Self {
         Self::PushStr(PushStr {
@@ -460,7 +474,7 @@ impl Operation {
             | Self::Assembly(PushAssembly { loc, .. })
             | Self::Typefence(Typefence { loc, .. })
             | Self::Cast(Cast { loc, .. })
-            | Self::None(loc) => loc,
+            | Self::None(loc) | Self::PushFnPtr(PushFnPtr { loc, .. }) => loc,
         }
     }
 
@@ -514,6 +528,7 @@ pub struct ProcedureContract {
     pub id: usize,
     pub loc: Loc,
     pub attributes: AttributeList,
+    pub name: String,
 }
 
 #[derive(Clone)]
@@ -1184,8 +1199,6 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
             PredefValue::CString(v) => inline_procs.insert(name.clone(), vec![Token::str_token(loc, v.clone(), true)]).map(|_| {}),
         };
     }
-
-
     
     let mut ip: usize = 0;
     let mut nesting: u64 = 0;
@@ -1739,6 +1752,7 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                     contract.loc = w.loc;
                     let id = iota();
                     contract.id = id;
+                    contract.name = name_tok.value.clone();
 
                     let mut out_types = false;
                     let mut type_tokens: Vec<WordToken> = vec![];
@@ -2571,6 +2585,14 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                     };
 
                     type_aliases.insert(name.value.clone(), (typ, w.value == "hard_type"));
+                } else if w.value == "get_fn" {
+                    let name = expect_word_tok!(&program.get_last_loc());
+
+                    if let Some(proc) = procs.get(&name.value) {
+                        program.ops.push(Operation::push_fn_ptr(w.loc, *proc));
+                    } else {
+                        err(&w.loc, format!("Could not find proc with name {}", name.value));
+                    }
                 } else if let Some(mut ops) = structs.get_ops_from_word(&w.value, &w.loc, &program)
                 {
                     ensure_in_fn!(&w.loc);

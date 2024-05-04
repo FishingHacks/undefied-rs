@@ -1,13 +1,18 @@
 use std::{
-    collections::HashMap, fmt::{Debug, Display}, process::exit
+    collections::HashMap,
+    fmt::{Debug, Display},
+    process::exit,
 };
 
 use crate::{
     error::{check_type_mismatch, check_type_mismatch_multiple, err, info, not_enough_types},
     parser::{
-        CallProc, Cast, Constant, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, ProcedureContract, Program, PushAssembly, PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret, Structs, Typefence
+        CallProc, Cast, Constant, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc,
+        ProcedureContract, Program, PushAssembly, PushConst, PushFnPtr, PushInt, PushLocalMem,
+        PushMem, PushStr, Ret, Structs, Typefence,
     },
-    tokenizer::{try_parse_num, Loc, WordToken}, GlobalString,
+    tokenizer::{try_parse_num, Loc, WordToken},
+    GlobalString,
 };
 
 #[derive(Clone)]
@@ -30,6 +35,13 @@ pub enum Type {
     Sized(usize),
     Named(GlobalString, Box<Type>),
     Struct(GlobalString, usize, usize),
+    FnPtr(Vec<Type>, Vec<Type>),
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.equal_to_strict(other)
+    }
 }
 
 impl Type {
@@ -95,6 +107,7 @@ impl Type {
             Self::Struct(..) => 16,
             Self::Array(..) => 17,
             Self::Named(..) => 18,
+            Self::FnPtr(..) => 19,
         }
     }
 
@@ -117,15 +130,25 @@ impl Type {
                 _ => false,
             },
             Self::Array(typ, elements) => match other {
-                Self::Array(typ_other, elements_other) => typ.equal_to(&typ_other) && *elements == *elements_other,
+                Self::Array(typ_other, elements_other) => {
+                    typ.equal_to(&typ_other) && *elements == *elements_other
+                }
                 _ => false,
-            }
+            },
             Self::Named(name_self, ..) => match other {
                 Self::Named(name_other, ..) => name_self.get().eq(name_other.get()),
                 _ => false,
-            }
+            },
+            Self::FnPtr(self_in, self_out) => match other {
+                Self::FnPtr(other_in, other_out) => other_in == self_in && other_out == self_out,
+                _ => false,
+            },
             _ => match other {
-                Self::PtrTo(..) | Self::Struct(..) | Self::Array(..) | Self::Named(..) => false,
+                Self::PtrTo(..)
+                | Self::Struct(..)
+                | Self::Array(..)
+                | Self::Named(..)
+                | Self::FnPtr(..) => false,
                 Self::Sized(sz) => self.get_size() == *sz,
                 _ => self.__unsafe_to_u8() == other.__unsafe_to_u8(),
             },
@@ -191,14 +214,56 @@ impl Type {
     fn get_inner<'a>(&'a self) -> &'a Type {
         match self {
             Self::Named(_, typ) => typ.get_inner(),
-            other => other
+            other => other,
         }
     }
 
-    pub fn from_tokens(tokens: &Vec<WordToken>, structs: &Structs, program: &Program, type_aliases: &HashMap<String, (Type, bool)>) -> Vec<Self> {
+    pub fn from_tokens(
+        tokens: &Vec<WordToken>,
+        structs: &Structs,
+        program: &Program,
+        type_aliases: &HashMap<String, (Type, bool)>,
+    ) -> Vec<Self> {
         let mut types: Vec<Self> = vec![];
 
+        let mut is_recording_fn = false;
+        let mut is_collecting_out = false;
+
+        let mut in_types: Vec<WordToken> = vec![];
+        let mut out_types: Vec<WordToken> = vec![];
+
         for WordToken { loc, value } in tokens {
+            if is_recording_fn {
+                if value == "--" && !is_collecting_out {
+                    is_collecting_out = true;
+                } else if value == "--" && is_collecting_out {
+                    err(loc, "Return types are already being specified");
+                } else if value == "end" {
+                    is_recording_fn = false;
+                    is_collecting_out = false;
+
+                    types.push(Type::FnPtr(
+                        Type::from_tokens(&in_types, structs, program, type_aliases),
+                        Type::from_tokens(&out_types, structs, program, type_aliases),
+                    ));
+
+                    in_types.clear();
+                    out_types.clear();
+                } else if is_collecting_out {
+                    out_types.push(WordToken {
+                        loc: *loc,
+                        value: value.clone(),
+                    })
+                } else {
+                    in_types.push(WordToken {
+                        loc: *loc,
+                        value: value.clone(),
+                    })
+                }
+
+                continue;
+            }
+
             if let Some(typ) = Self::non_ptrto_from_str(value) {
                 types.push(typ);
             } else if value == "ptr-to" {
@@ -226,9 +291,18 @@ impl Type {
                 } else {
                     err(loc, "array(...) has to follow a type it points to");
                 }
+            } else if value == "fn" {
+                is_recording_fn = true;
             } else {
                 err(loc, format!("Unknown type: {}", value));
             }
+        }
+
+        if is_recording_fn {
+            err(
+                &tokens[tokens.len() - 1].loc,
+                "Expected a type, `--` or end, but found nothing",
+            );
         }
 
         return types;
@@ -241,12 +315,14 @@ impl Type {
         if str.starts_with("array(-") {
             err(loc, "Arrays cannot have negative amount of elements");
         }
-        if let Some(num) = try_parse_num(&str[6..str.len()-1]) {
+        if let Some(num) = try_parse_num(&str[6..str.len() - 1]) {
             if num < 1 {
                 err(loc, "Arrays cannot have 0 amount of elements");
             }
             Some(num as usize)
-        } else {None}
+        } else {
+            None
+        }
     }
 
     pub fn to_str(&self) -> String {
@@ -267,8 +343,16 @@ impl Type {
             Self::Sized(v) => format!("Sized Type<{v}>"),
             Self::Struct(v, ..) => v.get().clone(),
             Self::PtrTo(other) => format!("{} ptr-to", other.to_str()),
-            Self::Array(other_type, elements) => format!("{} array({})", other_type.to_str(), *elements),
+            Self::Array(other_type, elements) => {
+                format!("{} array({})", other_type.to_str(), *elements)
+            }
             Self::Named(gstr, ..) => gstr.get().clone(),
+            Self::FnPtr(in_types, out_types) if out_types.len() > 0 => format!(
+                "fn {} -- {} end",
+                type_vec_to_str(in_types),
+                type_vec_to_str(out_types)
+            ),
+            Self::FnPtr(in_types, ..) => format!("fn {} end", type_vec_to_str(in_types)),
         }
     }
 
@@ -565,7 +649,10 @@ fn typecheck_(
                 if matches!(typ, Type::Any) {
                     stack.push(TypecheckType::new(Type::Ptr, loc.clone()))
                 } else {
-                    stack.push(TypecheckType::new(Type::PtrTo(Box::new(typ.clone())), loc.clone()))
+                    stack.push(TypecheckType::new(
+                        Type::PtrTo(Box::new(typ.clone())),
+                        loc.clone(),
+                    ))
                 }
             }
             Operation::PushStr(PushStr { loc, is_cstr, .. }) => {
@@ -839,11 +926,17 @@ fn typecheck_(
                     let typ = stack.pop().unwrap();
                     let unwrapped = match typ.typ {
                         Type::PtrTo(t) => *t,
-                        _ => err(&typ.loc, "@ expects a ptr to a type, not a unspecific pointer"),
+                        _ => err(
+                            &typ.loc,
+                            "@ expects a ptr to a type, not a unspecific pointer",
+                        ),
                     };
                     let intrinsic = match unwrapped.get_op_load_store(true) {
                         Some(v) => v,
-                        None => err(loc, format!("Could not get a load intrinsic for {}", unwrapped)),
+                        None => err(
+                            loc,
+                            format!("Could not get a load intrinsic for {}", unwrapped),
+                        ),
                     };
                     stack.push(TypecheckType::new(unwrapped, loc.clone()));
 
@@ -861,9 +954,12 @@ fn typecheck_(
                     };
                     let intrinsic = match unwrapped.get_op_load_store(false) {
                         Some(v) => v,
-                        None => err(loc, format!("Could not get a store intrinsic for {}", unwrapped)),
+                        None => err(
+                            loc,
+                            format!("Could not get a store intrinsic for {}", unwrapped),
+                        ),
                     };
-                    
+
                     let storing_typ = stack.pop().unwrap();
 
                     if !unwrapped.equal_to_strict(&storing_typ.typ) {
@@ -871,6 +967,21 @@ fn typecheck_(
                     }
 
                     program.ops[ip] = Operation::intrinsic(loc.clone(), intrinsic);
+                }
+                Intrinsic::CallFnPtr => {
+                    if stack.is_empty() {
+                        not_enough_types(loc, 1, stack.len());
+                    }
+                    let top = stack.pop().unwrap();
+                    let (in_types, out_types) = match top.typ {
+                        Type::FnPtr(in_types, out_types) => (in_types, out_types),
+                        typ => err(
+                            loc,
+                            format!("Expected a function pointer type, but found {}", typ),
+                        ),
+                    };
+
+                    check_proctypefence(&mut stack, &in_types, &out_types, loc);
                 }
             },
             Operation::Keyword(OpKeyword { keyword, loc, .. }) => match keyword {
@@ -962,6 +1073,17 @@ fn typecheck_(
                     }
                 }
             },
+            Operation::PushFnPtr(PushFnPtr { contract_id, loc }) => {
+                let contract = match program.contracts.get(&contract_id) {
+                    Some(v) => v,
+                    None => err(loc, "Could not get the contract for the function"),
+                };
+
+                stack.push(TypecheckType::new(
+                    Type::FnPtr(contract.in_types.clone(), contract.out_types.clone()),
+                    *loc,
+                ))
+            }
         }
 
         ip += 1;
@@ -982,12 +1104,16 @@ pub fn typecheck(program: &mut Program) {
         );
     }
     for proc in func_bodies {
-        let contract = program.contracts.get(&proc.id).unwrap_or_else(|| {
-            err(
-                &proc.loc,
-                "Could not acquire contract of function. (typecheck)",
-            )
-        }).clone();
+        let contract = program
+            .contracts
+            .get(&proc.id)
+            .unwrap_or_else(|| {
+                err(
+                    &proc.loc,
+                    "Could not acquire contract of function. (typecheck)",
+                )
+            })
+            .clone();
         if contract.attributes.has_attribute("__typecheck_ignore__") {
             info(&proc.loc, "UNSAFE: This function is not being typechecked");
             continue;

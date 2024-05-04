@@ -1,0 +1,3 @@
+target = "linux"
+file = "a.undefied"
+run = true

@@ -1,13 +1,19 @@
-use std::{fs::{remove_file, File}, io::{Read, Write}, os::unix::fs::FileExt, path::PathBuf, process::Command};
+use std::{
+    fs::{remove_file, File},
+    io::{Read, Write},
+    os::unix::fs::FileExt,
+    path::PathBuf,
+    process::Command,
+};
 
 use crate::{
     error::{err, err_generic, Log},
     parser::{
-        CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program,
-        PushAssembly, PushConst, PushInt, PushLocalMem, PushMem, PushStr, Ret,
+        CallProc, Intrinsic, Keyword, OpIntrinsic, OpKeyword, Operation, Proc, Program, PushAssembly, PushConst, PushFnPtr, PushInt, PushLocalMem, PushMem, PushStr, Ret
     },
     typecheck::Type,
-    utils::{get_stdpath, iota}, Config,
+    utils::{get_stdpath, iota},
+    Config,
 };
 
 const START: &str = r#"
@@ -95,7 +101,7 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
             str += ";; -- call run functions --\n";
             str += "mov %rax %rsp\n";
             str += "load32 .ret_stack_rsp %rsp\n";
-            
+
             for id in &program.run_functions {
                 str += &format!("call .addr_{}\n", *id);
             }
@@ -258,8 +264,11 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                         str += "push %rax\n";
                     }
 
-                    Intrinsic::Load | Intrinsic::Store => err(&loc, "@ and ! intrinsics aren't supported for no typechecking"),
-                    
+                    Intrinsic::Load | Intrinsic::Store => err(
+                        &loc,
+                        "@ and ! intrinsics aren't supported for no typechecking",
+                    ),
+
                     Intrinsic::Load8 => {
                         str += ";; @8\n";
                         str += "pop %rax\n";
@@ -301,6 +310,16 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                     Intrinsic::Load64 => err(&loc, "@64 and !64 are not supported"),
                     Intrinsic::Store64 => err(&loc, "@64 and !64 are not supported"),
 
+                    Intrinsic::CallFnPtr => {
+                        str += ";; call\n";
+                        str += "pop %rbx\n";
+                        str += "mov %rax %rsp\n";
+                        str += "load32 .ret_stack_rsp %rsp\n";
+                        str += "call %rbx\n";
+                        str += "store32 .ret_stack_rsp %rsp\n";
+                        str += "mov %rsp %rax\n";
+                    }
+
                     Intrinsic::CastBool
                     | Intrinsic::CastInt
                     | Intrinsic::CastPtr
@@ -313,7 +332,8 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                 str += ";; -- constant --\n";
                 str += &format!("push {}\n", constant.value);
             }
-            Operation::PushInt(PushInt { value, .. }) | Operation::PushPtr(PushInt { value, .. }) => {
+            Operation::PushInt(PushInt { value, .. })
+            | Operation::PushPtr(PushInt { value, .. }) => {
                 str += ";; -- int --\n";
                 str += &format!("push {}\n", value);
             }
@@ -439,14 +459,31 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                     );
                 }
             }
-            Operation::CallProc(CallProc { id, .. }) => {
+            Operation::CallProc(CallProc { id, externally_provided, .. }) => {
                 str += ";; -- call fn --\n";
                 str += "mov %rax %rsp\n";
                 str += "load32 .ret_stack_rsp %rsp\n";
-                str += &format!("call .addr_{}\n", *id);
+                if let Some(externally_provided) = externally_provided {
+                    str += &format!("call .{}", externally_provided);
+                } else {
+                    str += &format!("call .addr_{}\n", *id);
+                }
                 str += "store32 .ret_stack_rsp %rsp\n";
                 str += "mov %rsp %rax\n";
             }
+
+            Operation::PushFnPtr(PushFnPtr { contract_id, .. }) => {
+                let contract = program.contracts.get(contract_id).unwrap();
+                let name = if contract.attributes.has_attribute("__provided_externally__") {
+                    contract.attributes.get_value("__provided_externally__").unwrap_or(&contract.name).to_string()
+                } else {
+                    format!("addr_{}", *contract_id)
+                };
+
+                str += "    ;; -- push fn_ptr --\n";
+                str += &format!("    push .{name}\n");
+            }
+
             Operation::Ret(Ret {
                 dealloc_len,
                 is_end,
@@ -471,7 +508,7 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
                 str += asm;
                 str.push('\n');
             }
-            Operation::Typefence(..) | Operation::None(..)  | Operation::Cast(..) => {}
+            Operation::Typefence(..) | Operation::None(..) | Operation::Cast(..) => {}
         }
         ip += 1;
     }
@@ -502,7 +539,12 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
         str += &format!("#memory mem_{} {}\n", id, sz);
     }
 
-    let mut out_name = path.file_stem().expect("No file name found").to_str().expect("The file to compile is not valid").to_string();
+    let mut out_name = path
+        .file_stem()
+        .expect("No file name found")
+        .to_str()
+        .expect("The file to compile is not valid")
+        .to_string();
     out_name.push_str(".asm");
 
     let mut f = File::create(&out_name)?;
@@ -522,7 +564,7 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
 
     f.flush()?;
     drop(f);
-    
+
     let mut execpath = get_stdpath();
     execpath.push("skyvm");
     execpath.push("assembler");
@@ -541,7 +583,10 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
         remove_file("default.asm")?;
     }
 
-    if config.library_link_paths.len() > 0 || config.library_links.len() > 0 || config.run_after_compilation {
+    if config.library_link_paths.len() > 0
+        || config.library_links.len() > 0
+        || config.run_after_compilation
+    {
         println!("SkyVM does not support library links or run-after-compilation!");
     }
 

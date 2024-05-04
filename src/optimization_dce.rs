@@ -1,4 +1,4 @@
-use crate::parser::{CallProc, Operation, Proc, Program, Ret};
+use crate::parser::{CallProc, Operation, Proc, Program, PushFnPtr, Ret};
 
 pub fn optimize(program: &mut Program) {
     let mut for_visit: Vec<usize> = program
@@ -36,6 +36,11 @@ pub fn optimize(program: &mut Program) {
                 Operation::CallProc(CallProc { id, .. }) => {
                     if !visited.contains(id) {
                         for_visit.push(*id);
+                    }
+                }
+                Operation::PushFnPtr(PushFnPtr { contract_id, .. }) => {
+                    if !visited.contains(contract_id) {
+                        for_visit.push(*contract_id);
                     }
                 }
                 _ => {}

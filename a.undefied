@@ -1,6 +1,2 @@
-include "@io"
-include "@uint"
-
 fn main in
-    "main\n" puts
 end

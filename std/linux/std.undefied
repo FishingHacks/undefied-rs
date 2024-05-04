@@ -1,3 +1,17 @@
+include "@linux/syscalltable"
+
 inline fn exit int in
-    60 syscall1 drop
+    SYS_exit syscall1 drop
+end
+
+fn thread_spawn fn end -- int in
+    # NOTE: linux impl
+
+    SYS_fork syscall0
+
+    dup 0 = if
+        drop call
+        0 exit # <- this never return
+        0 # thus, this should be unreachable
+    else swap drop end
 end
