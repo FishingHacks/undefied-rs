@@ -12,7 +12,7 @@ use crate::{
         PushMem, PushStr, Ret, Structs, Typefence,
     },
     tokenizer::{try_parse_num, Loc, WordToken},
-    GlobalString,
+    CallingConvention, GlobalString,
 };
 
 #[derive(Clone)]
@@ -45,6 +45,43 @@ impl PartialEq for Type {
 }
 
 impl Type {
+    pub fn works_for_calling_convention(&self, convention: CallingConvention) -> bool {
+        match convention {
+            CallingConvention::Raw => !matches!(self, Self::FnPtr(..)),
+            CallingConvention::CStyle => match self {
+                Self::Int | Self::Bool | Self::Ptr => true,
+                Self::Any
+                | Self::T1
+                | Self::T2
+                | Self::T3
+                | Self::T4
+                | Self::T5
+                | Self::T6
+                | Self::T7
+                | Self::T8
+                | Self::T9
+                | Self::FnPtr(..)
+                | Self::Struct(..)
+                | Self::Array(..) => false,
+                Self::Named(_, inner) => inner.works_for_calling_convention(convention),
+                Self::Sized(size) => *size <= 8,
+                Self::PtrTo(child) => {
+                    let mut child = child;
+                    loop {
+                        match child.as_ref() {
+                            Self::PtrTo(new_child) | Self::Named(_, new_child) => child = new_child,
+                            Self::Sized(..) | Self::Struct(..) => break true,
+                            Self::Array(typ, _) => {
+                                break typ.works_for_calling_convention(convention)
+                            }
+                            c @ _ => break c.works_for_calling_convention(convention),
+                        }
+                    }
+                }
+            },
+        }
+    }
+
     pub fn get_size(&self) -> usize {
         match self {
             Self::Bool => 1,
@@ -136,7 +173,7 @@ impl Type {
                 _ => false,
             },
             Self::Named(name_self, ..) => match other {
-                Self::Named(name_other, ..) => name_self.get().eq(name_other.get()),
+                Self::Named(name_other, ..) => name_self == name_other,
                 _ => false,
             },
             Self::FnPtr(self_in, self_out) => match other {
@@ -341,12 +378,12 @@ impl Type {
             Self::T8 => "T8".to_string(),
             Self::T9 => "T9".to_string(),
             Self::Sized(v) => format!("Sized Type<{v}>"),
-            Self::Struct(v, ..) => v.get().clone(),
+            Self::Struct(v, ..) => v.get_string(),
             Self::PtrTo(other) => format!("{} ptr-to", other.to_str()),
             Self::Array(other_type, elements) => {
                 format!("{} array({})", other_type.to_str(), *elements)
             }
-            Self::Named(gstr, ..) => gstr.get().clone(),
+            Self::Named(gstr, ..) => gstr.get_string(),
             Self::FnPtr(in_types, out_types) if out_types.len() > 0 => format!(
                 "fn {} -- {} end",
                 type_vec_to_str(in_types),

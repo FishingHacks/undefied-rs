@@ -1,2 +1,18 @@
+include "@linux/std"
+include "@io"
+include "@uint"
+include "@ptr"
+include "@str"
+
+.param __provided_externally__
+.defparam __calling_convention__ "C"
+fn malloc int -- ptr in end
+
+.param __provided_externally__
+.defparam __calling_convention__ "C"
+fn free ptr in end
+
 fn main in
+0 cast(ptr) cast(Str)
+"" 
 end

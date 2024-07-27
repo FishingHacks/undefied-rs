@@ -2,7 +2,7 @@ new_type u8 1
 new_type u16 2
 new_type u32 4
 new_type u64 8
-type usize u64 end
+new_type usize 8
 
 .ifndef sizeof(u8) const sizeof(u8) 1 end .end
 .ifndef u8::MAX const u8::MAX 0xff end .end
@@ -117,3 +117,5 @@ undef __uint::u>=
 undef __uint::u>
 undef __uint::u<=
 undef __uint::u<
+
+inline fn cast(usize) any -- usize in .param empty_asm assembly any -- usize in end end

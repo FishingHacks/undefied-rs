@@ -12,19 +12,18 @@ use std::{
     collections::HashMap,
     fmt::{Arguments, Debug, Display},
     fs::read_to_string,
-    hash::Hash,
-    ops::Index,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 use toml::Table;
 
 use crate::{error::info_generic, tokenizer::try_parse_num};
+use global_strings::GlobalString;
 
 mod compiler_linux;
-mod compiler_skyvm;
 mod optimization_dce;
 // mod control_flow_dump;
+mod global_strings;
 mod error;
 mod linker;
 mod parser;
@@ -54,14 +53,12 @@ pub const VERSION: Version = Version::new(1, 0);
 #[derive(Debug, Clone, Copy)]
 pub enum CompilationTarget {
     Linux,
-    Skyvm,
 }
 
 impl Display for CompilationTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Linux => f.write_str("Linux"),
-            Self::Skyvm => f.write_str("SkyVM"),
         }
     }
 }
@@ -86,14 +83,12 @@ impl CompilationTarget {
                     || attrs.has_attribute("__supports_x86_64__")
                     || attrs.has_attribute("__supports_x86_64-linux__")
             }
-            Self::Skyvm => supports_value == "skyvm" || attrs.has_attribute("__supports_skyvm__"),
         }
     }
 
     pub fn from_str(str: &str) -> Option<Self> {
         match str {
             "linux" => Some(Self::Linux),
-            "skyvm" => Some(Self::Skyvm),
             _ => None,
         }
     }
@@ -156,92 +151,6 @@ impl Config {
             run_after_compilation: false,
         }
     }
-}
-
-static mut STRINGS: Option<Vec<String>> = None;
-
-fn init_strings() {
-    unsafe {
-        if let None = STRINGS {
-            STRINGS = Some(vec!["".to_string()])
-        }
-    }
-}
-
-macro_rules! get_strings {
-    () => {{
-        init_strings();
-        if let Some(v) = &STRINGS {
-            v
-        } else {
-            unreachable!()
-        }
-    }};
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-#[repr(transparent)]
-pub struct GlobalString(usize);
-
-impl Hash for GlobalString {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
-    }
-}
-
-impl GlobalString {
-    pub fn get(&self) -> &'static String {
-        get_str(self.0)
-    }
-
-    pub fn new(str: &String) -> Self {
-        Self(find_string(str).unwrap_or(insert_str(str.clone())))
-    }
-
-    pub fn from_static(str: &str) -> Self {
-        Self(find_string(str).unwrap_or(insert_str(str.to_string())))
-    }
-
-    pub fn from_str(str: String) -> Self {
-        Self(find_string(&str).unwrap_or(insert_str(str)))
-    }
-}
-
-impl Debug for GlobalString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.get())
-    }
-}
-
-impl Display for GlobalString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.get())
-    }
-}
-
-fn find_string(search_str: &str) -> Option<usize> {
-    for (idx, str) in unsafe { get_strings!().iter().enumerate() } {
-        if str == search_str {
-            return Some(idx);
-        }
-    }
-    None
-}
-
-fn insert_str(str: String) -> usize {
-    unsafe {
-        if let Some(v) = &mut STRINGS {
-            let idx = v.len();
-            v.push(str);
-            idx
-        } else {
-            unreachable!()
-        }
-    }
-}
-
-fn get_str(idx: usize) -> &'static String {
-    unsafe { get_strings!().index(idx) }
 }
 
 fn main() {
@@ -985,10 +894,6 @@ fn insert_predefs(file_name: &String, config: &mut Config) {
         "__TARGET_LINUX__".to_string(),
         PredefValue::Constant(CompilationTarget::Linux as u64),
     );
-    config.predefined.insert(
-        "__TARGET_SKYVM__".to_string(),
-        PredefValue::Constant(CompilationTarget::Skyvm as u64),
-    );
 
     config.predefined.insert(
         "__UNIXTIME__".to_string(),
@@ -1064,7 +969,6 @@ fn compile(file: PathBuf, mut config: Config) {
 
     if let Err(e) = match config.target {
         CompilationTarget::Linux => compiler_linux::compile(program, &config, &file),
-        CompilationTarget::Skyvm => compiler_skyvm::compile(program, &config, &file),
     } {
         err_generic(format!("Compilation failed: {}", e));
     }
@@ -1074,5 +978,20 @@ pub fn deal_with_error<T, E: Display>(str: Arguments<'_>, val: Result<T, E>) -> 
     match val {
         Ok(v) => v,
         Err(e) => err_generic(format!("{}{}", str, e)),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallingConvention {
+    Raw,
+    CStyle,
+}
+
+impl Display for CallingConvention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Raw => f.write_str("Raw Calling Convention"),
+            Self::CStyle => f.write_str("C-Style Calling Convention"),
+        }
     }
 }

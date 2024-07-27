@@ -29,7 +29,7 @@ impl Display for Loc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut stdpath = get_stdpath().to_str().unwrap().to_string();
         stdpath += "/";
-        let file = self.file.get().replace(&stdpath, "@");
+        let file = self.file.with(|file_str| file_str.replace(&stdpath, "@"));
         
         f.write_fmt(format_args!("{}:{}:{}", file, self.line, self.char))
     }

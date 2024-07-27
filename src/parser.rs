@@ -1146,7 +1146,7 @@ impl Memories {
                 }
                 Type::Struct(name, ..) => {
                     let mut path: String = String::with_capacity(100);
-                    path.push_str(name.get());
+                    name.with(|name| path.push_str(name));
 
                     while let Some(v) = paths.next() {
                         path.push('.');
@@ -1376,7 +1376,7 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                             .to_string();
                         path
                     } else {
-                        let mut path = PathBuf::from(&w.loc.file.get());
+                        let mut path = w.loc.file.with(|path_str| PathBuf::from(path_str));
                         path.pop();
                         path.push(path_str);
                         let path = path
@@ -1386,7 +1386,7 @@ pub fn parse_tokens(mut tokens: Vec<Token>, config: &Config) -> Program {
                         path
                     };
                     let path_gstr = GlobalString::new(&path);
-                    if path.eq(w.loc.file.get()) {
+                    if w.loc.file.with(|path_str| path.eq(path_str)) {
                         err(&w.loc, "Cannot include file from itself");
                     } else if !included_files.contains(&path_gstr)
                         || pragma_multiple.contains(&path_gstr)

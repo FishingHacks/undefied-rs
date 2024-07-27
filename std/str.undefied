@@ -2,8 +2,8 @@ include "@std"
 include "@uint"
 
 struct Str
-    content ptr
-    len usize ptr-to
+    content ptr in
+    len usize in
 end
 
 fn str::store int ptr ptr in
@@ -15,8 +15,15 @@ end
 
 fn str::print ptr in
     dup @Str.content
-    swap @Str.len puts
+    swap @Str.len cast(int) swap puts
 end
+
+fn str::copy int ptr Str ptr-to in
+    swap over !Str.content
+    .param empty_asm assembly int Str ptr-to -- usize Str ptr-to in end !Str.len
+end
+
+inline fn cast(Str) ptr -- Str ptr-to in .param empty_asm assembly ptr -- Str ptr-to in end end
 
 fn str::eq int ptr int ptr -- bool in
     memory ptra 8 end
@@ -27,7 +34,7 @@ fn str::eq int ptr int ptr -- bool in
     != if drop false return end
     
 
-    0 while over over u> do
+    0 while over over u64::> do
         dup ptra @64 +ptr @8
         over ptrb @64 +ptr @8
         != if drop drop false return end
@@ -37,4 +44,8 @@ fn str::eq int ptr int ptr -- bool in
 end
 
 new_type char 1
+.ifdef sizeof(char)
+    .ifc sizeof(char) 1 != .error "sizeof(char) was defined to something other than 1" .end
+.else
 const sizeof(char) 1 end
+.end

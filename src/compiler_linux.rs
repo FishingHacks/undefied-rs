@@ -11,7 +11,7 @@ use crate::parser::{
 };
 use crate::typecheck::Type;
 use crate::utils::iota;
-use crate::Config;
+use crate::{CallingConvention, Config};
 
 const START: &str = r#"BITS 64
 segment .text
@@ -85,20 +85,22 @@ fn syscall(mut num: u8) -> String {
     str
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CallingConvention {
-    Raw,
-    CStyle,
-}
-
-pub const ARGS_REGS: &[&str] = &["rdi", "rsi", "rdx", "r8", "r9"];
+pub const ARGS_REGS: &[&str] = &["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
 pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io::Result<()> {
     let mut str: String = String::with_capacity(1000);
 
     for contract in &program.contracts {
-        if contract.1.attributes.has_attribute("__provided_externally__") {
-            let name = contract.1.attributes.get_value("__provided_externally__").unwrap_or(&contract.1.name);
+        if contract
+            .1
+            .attributes
+            .has_attribute("__provided_externally__")
+        {
+            let name = contract
+                .1
+                .attributes
+                .get_value("__provided_externally__")
+                .unwrap_or(&contract.1.name);
             str.push_str("extern ");
             str.push_str(name);
             str.push('\n');
@@ -586,27 +588,45 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
             Operation::CallProc(CallProc {
                 id,
                 externally_provided,
-                ..
+                loc
             }) => {
                 str += "    ;; -- call fn --\n";
                 if let Some(name) = externally_provided {
                     let contract = program.contracts.get(id).unwrap();
 
-                    let convention = match contract.attributes.get_value("__calling_convention__").map(|str| str.as_str()) {
+                    let convention = match contract
+                        .attributes
+                        .get_value("__calling_convention__")
+                        .map(|str| str.as_str())
+                    {
                         None => err_generic("You have to specify a calling convention"),
                         Some("C") => CallingConvention::CStyle,
                         Some("raw") => CallingConvention::Raw,
-                        Some(convention) => err_generic(format!("Calling Convention {convention} is not supported by this target")),
+                        Some(convention) => err(loc, format!(
+                            "Calling Convention {convention} is not supported by this target"
+                        )),
                     };
 
+                    for in_type in &contract.in_types {
+                        if !in_type.works_for_calling_convention(convention) {
+                            err(loc, format!("The {convention} does not support type {in_type:?}"));
+                        }
+                    }
+                    for out_type in &contract.out_types {
+                        if !out_type.works_for_calling_convention(convention) {
+                            err(loc, format!("The {convention} does not support type {out_type:?}"));
+                        }
+                    }
+
                     if convention == CallingConvention::CStyle {
+                        if contract.out_types.len() > 1 {
+                            err(loc, format!("The {convention} does not support functions returning more than 1 argument"));
+                        }
                         for i in 0..contract.in_types.len().min(ARGS_REGS.len()) {
                             str += &format!("    pop {}\n", ARGS_REGS[i]);
                         }
                         str += &format!("    call {}\n", name);
-                        for i in 0..contract.out_types.len().min(ARGS_REGS.len()) {
-                            str += &format!("    push {}\n", ARGS_REGS[i]);
-                        }
+                        str += "    push rax\n";
                     } else if convention == CallingConvention::Raw {
                         str += &format!("    call {}\n", name);
                     }
@@ -622,7 +642,11 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
             Operation::PushFnPtr(PushFnPtr { contract_id, .. }) => {
                 let contract = program.contracts.get(contract_id).unwrap();
                 let name = if contract.attributes.has_attribute("__provided_externally__") {
-                    contract.attributes.get_value("__provided_externally__").unwrap_or(&contract.name).to_string()
+                    contract
+                        .attributes
+                        .get_value("__provided_externally__")
+                        .unwrap_or(&contract.name)
+                        .to_string()
                 } else {
                     format!("addr_{}", *contract_id)
                 };
@@ -728,7 +752,12 @@ pub fn compile(mut program: Program, config: &Config, path: &PathBuf) -> std::io
             ));
         }
 
-        let mut linker_args = vec!["-o", out_name];
+        let mut linker_args = vec![
+            "-o",
+            out_name,
+            "-dynamic-linker",
+            "/lib64/ld-linux-x86-64.so.2",
+        ];
 
         for path in &config.library_link_paths {
             linker_args.push("-L");
