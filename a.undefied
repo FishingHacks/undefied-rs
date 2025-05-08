@@ -1,18 +1,26 @@
-include "@linux/std"
-include "@io"
-include "@uint"
-include "@ptr"
-include "@str"
+#include "@linux/std"
+#include "@io"
+#include "@uint"
+#include "@ptr"
+#include "@str"
 
-.param __provided_externally__
-.defparam __calling_convention__ "C"
-fn malloc int -- ptr in end
+#.param __provided_externally__
+#.defparam __calling_convention__ "C"
+#fn malloc int -- ptr in end
 
-.param __provided_externally__
-.defparam __calling_convention__ "C"
-fn free ptr in end
+#.param __provided_externally__
+#.defparam __calling_convention__ "C"
+#fn free ptr in end
 
-fn main in
-0 cast(ptr) cast(Str)
-"" 
+#fn main in
+#0 cast(ptr) cast(Str)
+#"" 
+#end
+
+.param __function_exits__
+fn unreachable in end
+
+fn a bool -- int in
+    if 3 return else 4 return end
+    unreachable
 end
